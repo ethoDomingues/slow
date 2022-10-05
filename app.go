@@ -1,6 +1,7 @@
 package slow
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/ethodomingues/slow/routing"
@@ -45,5 +46,6 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 
 func (app *App) Listen() {
 	app.parse()
+	log.Println("Server is linsten in 0.0.0.0:5000")
 	http.ListenAndServe("0.0.0.0:5000", app)
 }
