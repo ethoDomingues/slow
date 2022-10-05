@@ -7,6 +7,12 @@ type Router struct {
 	routesByName map[string]*Route
 }
 
+func (r *Router) Parse() {
+	for _, route := range r.routes {
+		route.parse()
+	}
+}
+
 func (r *Router) Match(req *http.Request, mi *MatchInfo) bool {
 	for _, route := range r.routes {
 		if route.match(req, mi) {
@@ -28,4 +34,13 @@ func (r *Router) Add(route *Route) {
 
 	r.routes = append(r.routes, *route)
 	r.routesByName[route.Name] = route
+}
+
+func (r *Router) Get(url string, f Func) {
+	r.Add(&Route{
+		Url:     url,
+		Func:    f,
+		Name:    GetFunctionName(f),
+		Methods: []string{"GET"},
+	})
 }

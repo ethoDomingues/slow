@@ -6,9 +6,23 @@ import (
 	"github.com/ethodomingues/slow/routing"
 )
 
+func NewApp() *App {
+	return &App{
+		Router:  routing.Router{},
+		routers: []*routing.Router{},
+	}
+}
+
 type App struct {
 	routing.Router
-	routers []routing.Router
+	routers []*routing.Router
+}
+
+func (app *App) parse() {
+	app.Parse()
+	for _, router := range app.routers {
+		router.Parse()
+	}
 }
 
 func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
@@ -30,5 +44,6 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 }
 
 func (app *App) Listen() {
+	app.parse()
 	http.ListenAndServe("0.0.0.0:5000", app)
 }
