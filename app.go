@@ -42,6 +42,7 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 		wr.WriteHeader(404)
 		wr.Write([]byte("404 " + http.StatusText(404)))
 	}
+	log.Println(req.Method, req.URL.Path)
 }
 
 func (app *App) Listen() {
