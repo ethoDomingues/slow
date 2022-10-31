@@ -1,5 +1,6 @@
 # Slow
 
+## Simple Example
 ```go
 package main
 
