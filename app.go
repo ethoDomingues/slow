@@ -1,52 +1,273 @@
 package slow
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 
-	"github.com/ethodomingues/slow/routing"
+	"golang.org/x/exp/maps"
+)
+
+var (
+	l = newLogger()
+
+	servername    string
+	_secretKey    string
+	contextsNamed map[string]*Ctx
 )
 
 func NewApp() *App {
-	return &App{
-		Router:  routing.Router{},
-		routers: []*routing.Router{},
+
+	router := &Router{
+		_main:        true,
+		Name:         "",
+		Routes:       []*Route{},
+		routesByName: map[string]*Route{},
 	}
+	app := &App{
+		Router:       router,
+		routers:      []*Router{router},
+		routerByName: map[string]*Router{"": router},
+	}
+	return app
 }
 
 type App struct {
-	routing.Router
-	routers []*routing.Router
+	*Router
+
+	Servername string
+	SecretKey  string
+
+	routers      []*Router
+	routerByName map[string]*Router
 }
 
-func (app *App) parse() {
-	app.Parse()
+func (app *App) build() {
+	if app.Servername != "" {
+		servername = app.Servername
+	} else {
+		servername = "localhost:5000"
+	}
 	for _, router := range app.routers {
-		router.Parse()
+		router.parse()
+		maps.Copy(app.routesByName, router.routesByName)
 	}
 }
 
+func (app *App) Mount(rs ...*Router) {
+	for _, r := range rs {
+		if r.Name == "" {
+			panic(fmt.Errorf("the routers must be named"))
+		} else if _, ok := app.routerByName[r.Name]; ok {
+			panic(fmt.Errorf("router '%s' already regitered", r.Name))
+		}
+		app.routers = append(app.routers, r)
+	}
+}
+
+func (app *App) UrlFor(name string, external bool, params map[string]string) string {
+	var (
+		route  *Route
+		router *Router
+		ok     bool
+		host   = ""
+	)
+	for _, router = range app.routers {
+		if route, ok = router.routesByName[name]; ok {
+			break
+		}
+	}
+	if route == nil {
+		panic(errors.New("route '" + name + "' is not found"))
+	}
+	sUrl := strings.Split(route.fullUrl, "/")
+	var urlBuf strings.Builder
+	if external {
+		if router.Subdomain != "" {
+			host = "http://" + router.Subdomain + "." + servername
+		} else {
+			host = "http://" + servername
+		}
+	}
+	for _, str := range sUrl {
+		if re.isVar.MatchString(str) {
+			fname := re.getVarName(str)
+			value, ok := params[fname]
+			if !ok {
+				panic(errors.New("Route '" + name + "' needs parameter '" + str + "' but not passed"))
+			}
+			urlBuf.WriteString("/" + value)
+			delete(params, fname)
+		} else {
+			urlBuf.WriteString("/" + str)
+		}
+	}
+	if len(params) > 0 {
+		urlBuf.WriteString("?")
+		for k, v := range params {
+			urlBuf.WriteString(k + "=" + v + "&")
+		}
+	}
+	url := strings.TrimSuffix(urlBuf.String(), "&")
+	url = re.slash2.ReplaceAllString(url, "/")
+	url = re.dot2.ReplaceAllString(url, ".")
+	return strings.TrimSuffix(host, "/") + url
+}
+
+func (app *App) execRoute(ctx *Ctx) {
+	rsp := ctx.Response
+	rq := ctx.Request
+	defer func() {
+		err := recover()
+		if err == HttpAbort || err == nil {
+			if len(ctx.Session.jwt.Payload) > 0 {
+				s := ctx.Session.Save()
+				rsp.SetCookie(s)
+			}
+			rsp._afterRequest()
+			rsp.Headers.Save(rsp.raw)
+			rsp.raw.WriteHeader(rsp.StatusCode)
+			fmt.Fprint(rsp.raw, rsp.Body.String())
+		} else {
+			rsp.StatusCode = 200
+			statusText := ""
+			if TypeOf(err) == "string" {
+				str := err.(string)
+				if strings.HasPrefix(str, "abort:") {
+					strCode := strings.TrimPrefix(str, "abort:")
+					code, err := strconv.Atoi(strCode)
+					if err != nil {
+						panic(err)
+					}
+					rsp.StatusCode = code
+					statusText = strCode + " " + http.StatusText(code)
+				}
+			} else {
+				rsp.StatusCode = 500
+				statusText = "500 Internal Server Error"
+				newLogger().Error(err)
+			}
+			rsp.raw.WriteHeader(rsp.StatusCode)
+			fmt.Fprint(rsp.raw, statusText)
+		}
+	}()
+	for _, mid := range rq.MatchInfo.Router.Middlewares {
+		mid(ctx)
+	}
+	for _, mid := range rq.MatchInfo.Route.Middlewares {
+		mid(ctx)
+	}
+	// if raise a error in any mid, Route.Func not is executed.
+	rq.MatchInfo.Func(ctx)
+}
+
 func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
-	mi := &routing.MatchInfo{}
+
+	ctx := NewCtx(app, req.Context())
+
+	rsp := NewResponse(wr, ctx.id)
+	rq := NewRequest(req, ctx.id)
+
+	ctx.Request = rq
+	ctx.Response = rsp
+
+	contextsNamed[ctx.id] = ctx
+	defer delete(contextsNamed, ctx.id)
+
+	rq.Parse()
+
+	if app.SecretKey != "" {
+		if c, ok := rq.Cookies["session"]; ok {
+			ctx.Session.validate(c, app.SecretKey)
+		}
+	}
+
+	mi := rq.MatchInfo
 	for _, router := range app.routers {
 		if router.Match(req, mi) {
 			break
 		}
 	}
-	if mi.Route != nil {
-		mi.Route.Func(req, wr)
+	if mi.Match {
+		if rq.Raw.Method == "OPTIONS" {
+			rsp.StatusCode = 200
+			strMeths := strings.Join(mi.Route.Methods, ", ")
+			rsp.Headers.Set("Access-Control-Allow-Methods", strMeths)
+
+			rsp._afterRequest()
+
+			rsp.Headers.Save(rsp.raw)
+			fmt.Fprint(rsp.raw, "")
+		} else {
+			rq.Query = req.URL.Query()
+			rq.Args = re.getUrlValues(mi.Route.fullUrl, req.URL.Path)
+			app.execRoute(ctx)
+		}
 	} else if mi.MethodNotAllowed != nil {
-		wr.WriteHeader(405)
-		wr.Write([]byte("405 " + http.StatusText(405)))
+		rsp.StatusCode = 405
+		rsp.raw.WriteHeader(405)
+		fmt.Fprint(rsp.raw, "405 Method Not Allowed")
 	} else {
-		wr.WriteHeader(404)
-		wr.Write([]byte("404 " + http.StatusText(404)))
+		rsp.StatusCode = 404
+		rsp.raw.WriteHeader(404)
+		fmt.Fprint(rsp.raw, "404 Not Found")
 	}
-	log.Println(req.Method, req.URL.Path)
+	l.LogRequest(ctx.id)
 }
 
 func (app *App) Listen() {
-	app.parse()
-	log.Println("Server is linsten in 0.0.0.0:5000")
-	http.ListenAndServe("0.0.0.0:5000", app)
+	app.build()
+	srv := &http.Server{
+		Addr:           ":5000",
+		Handler:        app,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+	if contextsNamed == nil {
+		contextsNamed = map[string]*Ctx{}
+	}
+	l.Deafault("Server is linsten in", srv.Addr)
+	log.Fatal(srv.ListenAndServe())
 }
+
+func (app *App) listRoutes() {
+	app.build()
+	nameLen := 0
+	methLen := 0
+	pathLen := 0
+	for _, r := range app.routesByName {
+		if nl := len(r.fullName); nl > nameLen {
+			nameLen = nl + 1
+		}
+		if ml := len(strings.Join(r.Methods, " ")); ml > methLen {
+			methLen = ml + 1
+		}
+		if pl := len(r.fullUrl); pl > pathLen {
+			pathLen = pl + 1
+		}
+	}
+
+	line1 := strings.Repeat("-", nameLen)
+	line2 := strings.Repeat("-", methLen)
+	line3 := strings.Repeat("-", pathLen)
+	fmt.Printf("+-%s-+-%s-+-%s-+\n", line1, line2, line3)
+	for _, r := range app.routesByName {
+		mths_ := strings.Join(r.Methods, " ")
+		space1 := nameLen - len(r.fullName)
+		space2 := methLen - len(mths_)
+		space3 := pathLen - len(r.fullUrl)
+
+		endpoint := r.fullName + strings.Repeat(" ", space1)
+		mths := mths_ + strings.Repeat(" ", space2)
+		path := r.fullUrl + strings.Repeat(" ", space3)
+		fmt.Printf("| %s | %s | %s |\n", endpoint, mths, path)
+	}
+	fmt.Printf("+-%s-+-%s-+-%s-+\n", line1, line2, line3)
+}
+
+func (app *App) ShowRoutes() { app.listRoutes() }
