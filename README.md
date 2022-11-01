@@ -9,8 +9,8 @@ import "github.com/ethodomingues/slow"
 func main() {
 	app := slow.NewApp()
 	app.Get("/hello", helloWorld)
-	app.Get("/hello/{user}", helloUser) // user is any string
-	app.Get("/hello/{userID:int}", helloUser) // userID is only int
+	app.Get("/hello/{name}", helloUser) // 'name' is any string
+	app.Get("/hello/{userID:int}", userByID) // 'userID' is only int
 
 	app.Listen()
 }
@@ -24,8 +24,16 @@ func helloUser(ctx *slow.Ctx) {
 	rq := ctx.Request   // current Request
 	rsp := ctx.Response // current Response
 
-	user := rq.Args["user"]
-	rsp.HTML("Hello "+user, 200)
+	name := rq.Args["name"]
+	rsp.HTML("Hello "+name, 200)
+}
+func userByID(ctx *slow.Ctx) {
+	rq := ctx.Request   // current Request
+	rsp := ctx.Response // current Response
+
+	id := rq.Args["userID"]
+	user := AnyQuery(id)
+	rsp.JSON(user, 200)
 }
 
 ```

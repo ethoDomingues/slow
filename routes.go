@@ -2,7 +2,6 @@ package slow
 
 import (
 	"fmt"
-	"net/http"
 	"regexp"
 	"strings"
 )
@@ -17,14 +16,6 @@ type Meth struct {
 }
 
 type Ctrl map[string]*Meth
-
-func (c *Ctrl) Match(mth string) *Meth {
-	mh, ok := (*c)[mth]
-	if !ok {
-		Abort(405)
-	}
-	return mh
-}
 
 type Route struct {
 	Func
@@ -106,9 +97,12 @@ func (r *Route) parse() {
 	}
 }
 
-func (r *Route) matchURL(url string) bool {
+func (r *Route) matchURL(ctx *Ctx, url string) bool {
 	urlSplit := strings.Split(strings.TrimPrefix(url, "/"), "/")
 	if re.filepath.MatchString(r.fullUrl) {
+		if strings.HasPrefix(url, ctx.App.StaticUrlPath) {
+			return true
+		}
 		return false
 	}
 	if len(urlSplit) != len(r.urlRegex) {
@@ -123,9 +117,11 @@ func (r *Route) matchURL(url string) bool {
 	return true
 }
 
-func (r *Route) Match(req *http.Request, mi *MatchInfo) bool {
-	m := req.Method
-	if r.matchURL(req.URL.Path) {
+func (r *Route) Match(ctx *Ctx) bool {
+	rq := ctx.Request
+	mi := rq.MatchInfo
+	m := rq.Method
+	if r.matchURL(ctx, rq.Raw.URL.Path) {
 		if meth, ok := r.Ctrl[m]; ok {
 			mi.MethodNotAllowed = nil
 			mi.Match = true

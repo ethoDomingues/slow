@@ -36,6 +36,7 @@ func NewApp() *App {
 		TemplateFolder: "./templates",
 		StaticUrlPath:  "/assets",
 	}
+	router.Get("/assets/{filepath:filepath}", ServeFile)
 	return app
 }
 
@@ -60,7 +61,9 @@ func (app *App) build() {
 	}
 	for _, router := range app.routers {
 		router.parse()
-		maps.Copy(app.routesByName, router.routesByName)
+		if router.Name != "" {
+			maps.Copy(app.routesByName, router.routesByName)
+		}
 	}
 }
 
@@ -194,7 +197,7 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 
 	mi := rq.MatchInfo
 	for _, router := range app.routers {
-		if router.Match(req, mi) {
+		if router.Match(ctx) {
 			break
 		}
 	}

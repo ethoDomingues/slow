@@ -62,7 +62,7 @@ func (r *Response) _afterRequest() {
 	}
 }
 
-func (r *Response) closeResponse() {
+func (r *Response) Close() {
 	panic(HttpAbort)
 }
 
@@ -124,22 +124,18 @@ func (r *Response) InternalServerError() { r.Abort(500) }
 
 func (r *Response) RenderTemplate(pathToFile string, data ...any) {
 	ctx := r.Ctx()
-	// rq := ctx.Request
-
 	dir, file := filepath.Split(ctx.App.TemplateFolder + pathToFile)
 	d := http.Dir(dir)
 	if f, err := d.Open(file); err == nil {
 		defer f.Close()
-
 		buf := bytes.NewBuffer(nil)
 		io.Copy(buf, f)
-
 		t, err := template.New(file).Parse(buf.String())
 		if err != nil {
 			l.err.Panic(err)
 		}
 		t.Execute(r.Body, data)
-		r.closeResponse()
+		r.Close()
 	} else {
 		l.err.Panicln(err)
 	}

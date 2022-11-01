@@ -2,7 +2,6 @@ package slow
 
 import (
 	"fmt"
-	"net/http"
 	"regexp"
 	"strings"
 )
@@ -35,7 +34,11 @@ func (r *Router) parse() {
 		panic(fmt.Errorf("the routers must be named"))
 	}
 	for _, route := range r.Routes {
-		route.fullName = r.Name + "." + route.Name
+		if r.Name != "" {
+			route.fullName = r.Name + "." + route.Name
+		} else {
+			route.fullName = route.Name
+		}
 		if r.Prefix != "" && !strings.HasPrefix(r.Prefix, "/") {
 			panic(fmt.Errorf("Router '%v' Prefix must start with slash or be a null string ", r.Name))
 		} else if route.Url != "" && (!strings.HasPrefix(route.Url, "/") && !strings.HasSuffix(r.Prefix, "/")) {
@@ -61,12 +64,14 @@ func (r *Router) parse() {
 	}
 }
 
-func (r *Router) Match(req *http.Request, mi *MatchInfo) bool {
-	if !r.subdomainRegex.MatchString(req.Host) {
+func (r *Router) Match(ctx *Ctx) bool {
+	rq := ctx.Request
+	mi := rq.MatchInfo
+	if !r.subdomainRegex.MatchString(rq.Raw.Host) {
 		return false
 	}
 	for _, route := range r.Routes {
-		if route.Match(req, mi) {
+		if route.Match(ctx) {
 			mi.Router = r
 			return true
 		}
@@ -83,7 +88,11 @@ func (r *Router) addRoute(route *Route) {
 		panic(route.Name + " already registered!")
 	}
 	r.Routes = append(r.Routes, route)
-	r.routesByName[r.Name+"."+route.Name] = route
+	if r.Name != "" {
+		r.routesByName[r.Name+"."+route.Name] = route
+	} else {
+		r.routesByName[route.Name] = route
+	}
 }
 
 func (r *Router) AddAll(routes ...*Route) {
