@@ -29,9 +29,12 @@ func NewApp() *App {
 		routesByName: map[string]*Route{},
 	}
 	app := &App{
-		Router:       router,
-		routers:      []*Router{router},
-		routerByName: map[string]*Router{"": router},
+		Router:         router,
+		routers:        []*Router{router},
+		routerByName:   map[string]*Router{"": router},
+		StaticFolder:   "./assets",
+		TemplateFolder: "./templates",
+		StaticUrlPath:  "/assets",
 	}
 	return app
 }
@@ -39,8 +42,11 @@ func NewApp() *App {
 type App struct {
 	*Router
 
-	Servername string
-	SecretKey  string
+	SecretKey,
+	Servername,
+	StaticFolder,
+	TemplateFolder,
+	StaticUrlPath string
 
 	routers      []*Router
 	routerByName map[string]*Router

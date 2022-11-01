@@ -31,18 +31,18 @@ type _re struct {
 }
 
 var (
-	str      = regexp.MustCompile(`{\w+(:str)?}`)
-	digit    = regexp.MustCompile(`{\w+:int}`)
-	filepath = regexp.MustCompile(`{\w+:filepath}`)
-	isVar    = regexp.MustCompile(`{\w+(\:(int|str|filepath))?}`)
-	dot2     = regexp.MustCompile(`[.]{2,}`)
-	slash2   = regexp.MustCompile(`[\/]{2,}`)
+	isStr      = regexp.MustCompile(`{\w+(:str)?}`)
+	isDigit    = regexp.MustCompile(`{\w+:int}`)
+	isFilepath = regexp.MustCompile(`{\w+:filepath}`)
+	isVar      = regexp.MustCompile(`{\w+(\:(int|str|filepath))?}`)
+	dot2       = regexp.MustCompile(`[.]{2,}`)
+	slash2     = regexp.MustCompile(`[\/]{2,}`)
 
 	re = _re{
-		str:      str,
-		digit:    digit,
+		str:      isStr,
 		isVar:    isVar,
-		filepath: filepath,
+		digit:    isDigit,
+		filepath: isFilepath,
 		dot2:     dot2,
 		slash2:   slash2,
 	}

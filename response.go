@@ -4,8 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html/template"
+	"io"
 	"net/http"
+	"path/filepath"
 )
+
+func Abort(code int) { panic(fmt.Errorf("abort:%d", code)) }
 
 func NewResponse(wr http.ResponseWriter, ctxID string) *Response {
 	return &Response{
@@ -25,8 +30,6 @@ type Response struct {
 	Body    *bytes.Buffer
 	Headers *Headers
 }
-
-func (r *Response) Ctx() *Ctx { return contextsNamed[r.ctx] }
 
 func (r *Response) _afterRequest() {
 	ctx := r.Ctx()
@@ -59,6 +62,12 @@ func (r *Response) _afterRequest() {
 	}
 }
 
+func (r *Response) closeResponse() {
+	panic(HttpAbort)
+}
+
+func (r *Response) Ctx() *Ctx { return contextsNamed[r.ctx] }
+
 func (r *Response) SetCookie(cookie *http.Cookie) { r.Headers.SetCookie(cookie) }
 
 func (r *Response) Abort(code int) {
@@ -67,6 +76,7 @@ func (r *Response) Abort(code int) {
 	r.StatusCode = code
 	panic(HttpAbort)
 }
+
 func (r *Response) Redirect(url string) {
 	ctx := r.Ctx()
 	rq := ctx.Request
@@ -103,6 +113,7 @@ func (r *Response) HTML(body string, code int) {
 	panic(HttpAbort)
 }
 
+func (r *Response) Ok()                  { r.Abort(200) }
 func (r *Response) BadRequest()          { r.Abort(400) }
 func (r *Response) Unauthorized()        { r.Abort(401) }
 func (r *Response) Forbidden()           { r.Abort(403) }
@@ -111,4 +122,25 @@ func (r *Response) MethodNotAllowed()    { r.Abort(405) }
 func (r *Response) ImATaerpot()          { r.Abort(418) }
 func (r *Response) InternalServerError() { r.Abort(500) }
 
-func Abort(code int) { panic(fmt.Errorf("abort:%d", code)) }
+func (r *Response) RenderTemplate(pathToFile string, data ...any) {
+	ctx := r.Ctx()
+	// rq := ctx.Request
+
+	dir, file := filepath.Split(ctx.App.TemplateFolder + pathToFile)
+	d := http.Dir(dir)
+	if f, err := d.Open(file); err == nil {
+		defer f.Close()
+
+		buf := bytes.NewBuffer(nil)
+		io.Copy(buf, f)
+
+		t, err := template.New(file).Parse(buf.String())
+		if err != nil {
+			l.err.Panic(err)
+		}
+		t.Execute(r.Body, data)
+		r.closeResponse()
+	} else {
+		l.err.Panicln(err)
+	}
+}

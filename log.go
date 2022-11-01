@@ -32,16 +32,16 @@ func newLogger() *Logger {
 	warn := log.New(os.Stdout, _YELLOW+"warn: "+_RESET, log.Ldate|log.Ltime)
 	erro := log.New(os.Stdout, _RED+"error: "+_RESET, 0)
 	return &Logger{
-		info:  info,
-		warn:  warn,
-		error: erro,
+		info: info,
+		warn: warn,
+		err:  erro,
 	}
 }
 
 type Logger struct {
-	info  *log.Logger
-	warn  *log.Logger
-	error *log.Logger
+	info *log.Logger
+	warn *log.Logger
+	err  *log.Logger
 }
 
 func (l *Logger) Deafault(v ...any) {
@@ -49,7 +49,7 @@ func (l *Logger) Deafault(v ...any) {
 }
 
 func (l *Logger) Error(v ...any) {
-	l.error.Println(v...)
+	l.err.Println(v...)
 	for i := 4; i < 10; i++ {
 		_, file, line, _ := runtime.Caller(i)
 		fmt.Printf("\t%s:%d\n", file, line)
