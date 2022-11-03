@@ -63,6 +63,8 @@ func ValidJWT(jwt, secret string) (*JWT, bool) {
 					tm, _ := strconv.Atoi(p["exp"])
 					if time.Now().Before(time.Unix(int64(tm), 0)) {
 						return &JWT{Headers: h, Payload: p, Secret: secret}, true
+					} else {
+						return &JWT{Headers: h, Payload: p, Secret: secret}, false
 					}
 				}
 			}

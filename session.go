@@ -15,10 +15,22 @@ func NewSession() *Session {
 
 type Session struct {
 	jwt              *JWT
-	permanent        bool
+	Permanent        bool
 	expires          time.Time
 	expiresPermanent time.Time
 	del              []string
+}
+
+func (s *Session) validate(c *http.Cookie, secret string) {
+	str := c.Value
+	if jwt, ok := ValidJWT(str, secret); ok {
+		s.jwt = jwt
+		if _, ok := s.jwt.Payload["_permanent"]; ok {
+			s.Permanent = true
+		}
+	} else {
+		s.jwt = NewJWT()
+	}
 }
 
 func (s *Session) Set(key, value string) {
@@ -33,10 +45,6 @@ func (s *Session) Get(key string) (string, bool) {
 func (s *Session) Del(key string) {
 	s.del = append(s.del, key)
 	delete(s.jwt.Payload, key)
-}
-
-func (s *Session) Permanent(p bool) {
-	s.permanent = p
 }
 
 func (s *Session) Save() *http.Cookie {
@@ -54,12 +62,13 @@ func (s *Session) Save() *http.Cookie {
 			MaxAge:   -1,
 		}
 	}
-	if s.permanent {
+	if s.Permanent {
 		if s.expiresPermanent.IsZero() {
 			exp = time.Now().Add(time.Hour * 24 * 31)
 		} else {
 			exp = s.expiresPermanent
 		}
+		s.jwt.Payload["_permanent"] = "1"
 	} else {
 		if s.expires.IsZero() {
 			exp = time.Now().Add(time.Hour)
@@ -77,11 +86,6 @@ func (s *Session) Save() *http.Cookie {
 	}
 }
 
-func (s *Session) validate(c *http.Cookie, secret string) {
-	str := c.Value
-	if jwt, ok := ValidJWT(str, secret); ok {
-		s.jwt = jwt
-	} else {
-		s.jwt = NewJWT()
-	}
+func (s *Session) GetSign() string {
+	return s.Save().Value
 }

@@ -51,6 +51,10 @@ type App struct {
 
 	routers      []*Router
 	routerByName map[string]*Router
+
+	BeforeRequest   Func
+	AfterRequest    Func
+	TearDownRequest Func
 }
 
 func (app *App) build() {
@@ -80,24 +84,23 @@ func (app *App) Mount(rs ...*Router) {
 
 func (app *App) UrlFor(name string, external bool, params map[string]string) string {
 	var (
-		route  *Route
-		router *Router
-		ok     bool
-		host   = ""
+		route *Route
+		host  = ""
 	)
-	for _, router = range app.routers {
-		if route, ok = router.routesByName[name]; ok {
-			break
-		}
+	if r, ok := app.routesByName[name]; ok {
+		route = r
 	}
+
 	if route == nil {
 		panic(errors.New("route '" + name + "' is not found"))
 	}
-	sUrl := strings.Split(route.fullUrl, "/")
+	var r = route.Router
+	var sUrl = strings.Split(route.fullUrl, "/")
 	var urlBuf strings.Builder
+
 	if external {
-		if router.Subdomain != "" {
-			host = "http://" + router.Subdomain + "." + servername
+		if r.Subdomain != "" {
+			host = "http://" + r.Subdomain + "." + servername
 		} else {
 			host = "http://" + servername
 		}
@@ -130,6 +133,9 @@ func (app *App) UrlFor(name string, external bool, params map[string]string) str
 func (app *App) execRoute(ctx *Ctx) {
 	rsp := ctx.Response
 	rq := ctx.Request
+	if app.BeforeRequest != nil {
+		app.BeforeRequest(ctx)
+	}
 	defer func() {
 		err := recover()
 		if err == HttpAbort || err == nil {
@@ -162,6 +168,9 @@ func (app *App) execRoute(ctx *Ctx) {
 			}
 			rsp.raw.WriteHeader(rsp.StatusCode)
 			fmt.Fprint(rsp.raw, statusText)
+			if app.TearDownRequest != nil {
+				app.TearDownRequest(ctx)
+			}
 		}
 	}()
 	for _, mid := range rq.MatchInfo.Router.Middlewares {
@@ -172,6 +181,9 @@ func (app *App) execRoute(ctx *Ctx) {
 	}
 	// if raise a error in any mid, Route.Func not is executed.
 	rq.MatchInfo.Func(ctx)
+	if app.AfterRequest != nil {
+		app.AfterRequest(ctx)
+	}
 }
 
 func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {

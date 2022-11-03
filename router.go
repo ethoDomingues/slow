@@ -18,13 +18,16 @@ func NewRouter(name string, cfg map[string]string) *Router {
 }
 
 type Router struct {
-	_main          bool
-	Name           string
-	Prefix         string
-	Subdomain      string
+	_main bool
+
+	Name,
+	Prefix,
+	Subdomain string
+
 	Routes         []*Route
 	subdomainRegex *regexp.Regexp
 	routesByName   map[string]*Route
+
 	Middlewares
 	*Cors
 }
@@ -48,6 +51,7 @@ func (r *Router) parse() {
 		re.slash2.ReplaceAllString(route.fullName, "/")
 
 		route.parse()
+		route.Router = r
 		r.routesByName[route.fullName] = route
 
 	}
@@ -66,13 +70,11 @@ func (r *Router) parse() {
 
 func (r *Router) Match(ctx *Ctx) bool {
 	rq := ctx.Request
-	mi := rq.MatchInfo
 	if !r.subdomainRegex.MatchString(rq.Raw.Host) {
 		return false
 	}
 	for _, route := range r.Routes {
 		if route.Match(ctx) {
-			mi.Router = r
 			return true
 		}
 	}
@@ -85,7 +87,7 @@ func (r *Router) addRoute(route *Route) {
 		r.routesByName = map[string]*Route{}
 	}
 	if _, ok := r.routesByName[route.Name]; ok {
-		panic(route.Name + " already registered!")
+		l.err.Panic(route.Name + " already registered!")
 	}
 	r.Routes = append(r.Routes, route)
 	if r.Name != "" {

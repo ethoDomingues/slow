@@ -17,7 +17,6 @@ type MatchInfo struct {
 	Match            bool
 	Func
 	*Route
-	*Router
 }
 
 type _re struct {

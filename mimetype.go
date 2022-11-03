@@ -447,6 +447,8 @@ var TypeByExtension = map[string]string{
 	"token-introspection+jwt":                   "application/token-introspection+jwt",
 	"trickle-ice-sdpfrag":                       "application/trickle-ice-sdpfrag",
 	"trig":                                      "application/trig",
+	"typescript":                                "text/javascript",
+	"ts":                                        "text/javascript",
 	"ttml+xml":                                  "application/ttml+xml",
 	"tve-trigger":                               "application/tve-trigger",
 	"tzif":                                      "application/tzif",

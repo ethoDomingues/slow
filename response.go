@@ -34,11 +34,13 @@ type Response struct {
 func (r *Response) _afterRequest() {
 	ctx := r.Ctx()
 	method := ctx.Request.Method
-	if ctx.Request.MatchInfo.Router.Cors != nil {
-		ctx.Request.MatchInfo.Router.Cors.parse(r.Headers)
+	routerCors := ctx.Request.MatchInfo.Route.Router.Cors
+	if routerCors != nil {
+		routerCors.parse(r.Headers)
 	}
-	if ctx.Request.MatchInfo.Route.Cors != nil {
-		ctx.Request.MatchInfo.Route.Cors.parse(r.Headers)
+	routeCors := ctx.Request.MatchInfo.Route.Cors
+	if routeCors != nil {
+		routeCors.parse(r.Headers)
 	}
 	if method == "OPTIONS" {
 		h := *(r.Headers)

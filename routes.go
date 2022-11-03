@@ -31,6 +31,7 @@ type Route struct {
 	fullName string
 	fullUrl  string
 	urlRegex []*regexp.Regexp
+	Router   *Router
 }
 
 func (r *Route) compileUrl() {
@@ -133,7 +134,6 @@ func (r *Route) Match(ctx *Ctx) bool {
 		}
 		mi.MethodNotAllowed = ErrorMethodMismatch
 	}
-	mi.Router = nil
 	mi.Route = nil
 	return false
 }
