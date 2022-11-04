@@ -60,12 +60,14 @@ func ValidJWT(jwt, secret string) (*JWT, bool) {
 							json.Unmarshal(pJSON, &p)
 						}
 					}
-					tm, _ := strconv.Atoi(p["exp"])
-					if time.Now().Before(time.Unix(int64(tm), 0)) {
-						return &JWT{Headers: h, Payload: p, Secret: secret}, true
-					} else {
+					if exp, ok := p["exp"]; ok {
+						tm, _ := strconv.Atoi(exp)
+						if time.Now().Before(time.Unix(int64(tm), 0)) {
+							return &JWT{Headers: h, Payload: p, Secret: secret}, true
+						}
 						return &JWT{Headers: h, Payload: p, Secret: secret}, false
 					}
+					return &JWT{Headers: h, Payload: p, Secret: secret}, true
 				}
 			}
 		}

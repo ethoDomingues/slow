@@ -276,6 +276,13 @@ func (app *App) listRoutes() {
 	line1 := strings.Repeat("-", nameLen)
 	line2 := strings.Repeat("-", methLen)
 	line3 := strings.Repeat("-", pathLen)
+
+	routeN := "ROUTES" + strings.Repeat(" ", nameLen-6)
+	methodsN := "METHODS" + strings.Repeat(" ", methLen-7)
+	endpointN := "ENDPOINTS" + strings.Repeat(" ", pathLen-9)
+
+	fmt.Printf("+-%s-+-%s-+-%s-+\n", line1, line2, line3)
+	fmt.Printf("| %s | %s | %s |\n", routeN, methodsN, endpointN)
 	fmt.Printf("+-%s-+-%s-+-%s-+\n", line1, line2, line3)
 	for _, r := range app.routesByName {
 		mths_ := strings.Join(r.Methods, " ")

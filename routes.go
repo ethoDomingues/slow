@@ -58,6 +58,9 @@ func (r *Route) compileUrl() {
 }
 
 func (r *Route) parse() {
+	if r.Func == nil && r.Ctrl == nil {
+		l.err.Fatalf("Route '%s' need a func or Ctrl\n", r.fullName)
+	}
 	r.compileUrl()
 	ctrl := Ctrl{"OPTIONS": nil}
 	strMth := map[string]any{}
