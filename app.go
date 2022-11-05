@@ -55,9 +55,14 @@ type App struct {
 	BeforeRequest   Func
 	AfterRequest    Func
 	TearDownRequest Func
+
+	building bool
 }
 
 func (app *App) build() {
+	if app.building {
+		return
+	}
 	if app.Servername != "" {
 		servername = app.Servername
 	} else {
@@ -69,6 +74,7 @@ func (app *App) build() {
 			maps.Copy(app.routesByName, router.routesByName)
 		}
 	}
+	app.building = true
 }
 
 func (app *App) Mount(rs ...*Router) {
