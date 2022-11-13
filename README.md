@@ -1,6 +1,13 @@
 # Slow
 
+## [Com a correta configuraçao do go](https://go.dev/doc/install) 
+
+```sh
+$ go get github.com/ethoDomingues/slow
+```
+
 ## Simple Example
+_main.go_
 ```go
 package main
 
@@ -35,5 +42,4 @@ func userByID(ctx *slow.Ctx) {
 	user := AnyQuery(id)
 	rsp.JSON(user, 200)
 }
-
 ```
