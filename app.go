@@ -77,14 +77,14 @@ func (app *App) build() {
 	app.building = true
 }
 
-func (app *App) Mount(rs ...*Router) {
-	for _, r := range rs {
-		if r.Name == "" {
+func (app *App) Mount(routes ...*Router) {
+	for _, route := range routes {
+		if route.Name == "" {
 			panic(fmt.Errorf("the routers must be named"))
-		} else if _, ok := app.routerByName[r.Name]; ok {
-			panic(fmt.Errorf("router '%s' already regitered", r.Name))
+		} else if _, ok := app.routerByName[route.Name]; ok {
+			panic(fmt.Errorf("router '%s' already regitered", route.Name))
 		}
-		app.routers = append(app.routers, r)
+		app.routers = append(app.routers, route)
 	}
 }
 
