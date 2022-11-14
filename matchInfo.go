@@ -9,14 +9,14 @@ import (
 var (
 	ErrorMethodMismatch = errors.New("405 Method Not Allowed")
 	ErrorNotFound       = errors.New("404 Not Found")
-	reMethods           = regexp.MustCompile("^(?i)(GET|PUT|HEAD|POST|TRACE|PATCH|DELETE|CONNECT|OPTIONS)$")
 )
 
 type MatchInfo struct {
 	MethodNotAllowed error
 	Match            bool
 	Func
-	*Route
+	Route  *Route
+	Router *Router
 }
 
 type _re struct {
@@ -24,22 +24,28 @@ type _re struct {
 	digit    *regexp.Regexp
 	filepath *regexp.Regexp
 
-	isVar  *regexp.Regexp
-	dot2   *regexp.Regexp
-	slash2 *regexp.Regexp
+	isVar    *regexp.Regexp
+	isVarOpt *regexp.Regexp
+	dot2     *regexp.Regexp
+	slash2   *regexp.Regexp
 }
 
 var (
-	isStr      = regexp.MustCompile(`{\w+(:str)?}`)
-	isDigit    = regexp.MustCompile(`{\w+:int}`)
+	isStr      = regexp.MustCompile(`{\w+(:str)?[?]?}`)
+	isVar      = regexp.MustCompile(`{\w+(\:(int|str|filepath))?[?]?}`)
+	isVarOpt   = regexp.MustCompile(`{\w+(\:(int|str))?[\?]}`)
+	isDigit    = regexp.MustCompile(`{\w+:int[?]?}`)
 	isFilepath = regexp.MustCompile(`{\w+:filepath}`)
-	isVar      = regexp.MustCompile(`{\w+(\:(int|str|filepath))?}`)
-	dot2       = regexp.MustCompile(`[.]{2,}`)
-	slash2     = regexp.MustCompile(`[\/]{2,}`)
+
+	dot2      = regexp.MustCompile(`[.]{2,}`)
+	isIP      = regexp.MustCompile(`^([0,255][.][0,255][.][0,255][.][0,255])((:[0,65535])?)$`)
+	slash2    = regexp.MustCompile(`[\/]{2,}`)
+	reMethods = regexp.MustCompile("^(?i)(GET|PUT|HEAD|POST|TRACE|PATCH|DELETE|CONNECT|OPTIONS)$")
 
 	re = _re{
 		str:      isStr,
 		isVar:    isVar,
+		isVarOpt: isVarOpt,
 		digit:    isDigit,
 		filepath: isFilepath,
 		dot2:     dot2,

@@ -51,16 +51,24 @@ func (r *Router) parse() {
 		re.slash2.ReplaceAllString(route.fullName, "/")
 
 		route.parse()
-		route.Router = r
 		r.routesByName[route.fullName] = route
 
 	}
 
 	if r.Subdomain != "" {
 		sub := r.Subdomain
-		if re.isVar.MatchString(r.Subdomain) {
-			sub = re.str.ReplaceAllString(r.Subdomain, `(\w+)`)
-			sub = re.digit.ReplaceAllString(r.Subdomain, `(\d+)`)
+		if re.digit.MatchString(sub) {
+			l.err.Fatalf("router subdomain dont accept 'int' varible. Router: '%s'", r.Name)
+		}
+		if re.filepath.MatchString(sub) {
+			l.err.Fatalf("router subdomain dont accept 'filepath' varible. Router: '%s'", r.Name)
+		}
+		if re.isVar.MatchString(sub) {
+			if re.isVarOpt.MatchString(sub) {
+				sub = re.str.ReplaceAllString(sub, `(\w+)?`)
+			} else {
+				sub = re.str.ReplaceAllString(sub, `(\w+)`)
+			}
 		}
 		r.subdomainRegex = regexp.MustCompile(`^(` + sub + "[.]" + servername + `)$`)
 	} else {
@@ -70,11 +78,15 @@ func (r *Router) parse() {
 
 func (r *Router) Match(ctx *Ctx) bool {
 	rq := ctx.Request
-	if !r.subdomainRegex.MatchString(rq.Raw.Host) {
-		return false
+	if r.subdomainRegex != nil {
+
+		if !r.subdomainRegex.MatchString(rq.Raw.Host) {
+			return false
+		}
 	}
 	for _, route := range r.Routes {
 		if route.Match(ctx) {
+			ctx.Request.MatchInfo.Router = r
 			return true
 		}
 	}

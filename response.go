@@ -34,7 +34,7 @@ type Response struct {
 func (r *Response) _afterRequest() {
 	ctx := r.Ctx()
 	method := ctx.Request.Method
-	routerCors := ctx.Request.MatchInfo.Route.Router.Cors
+	routerCors := ctx.Request.MatchInfo.Router.Cors
 	if routerCors != nil {
 		routerCors.parse(r.Headers)
 	}

@@ -90,23 +90,29 @@ func (app *App) Mount(routes ...*Router) {
 
 func (app *App) UrlFor(name string, external bool, params map[string]string) string {
 	var (
-		route *Route
-		host  = ""
+		host   = ""
+		route  *Route
+		router *Router
 	)
 	if r, ok := app.routesByName[name]; ok {
 		route = r
+	}
+	if strings.Contains(name, ".") {
+		routerName := strings.Split(name, ",")[0]
+		router = app.routerByName[routerName]
+	} else {
+		router = app.Router
 	}
 
 	if route == nil {
 		panic(errors.New("route '" + name + "' is not found"))
 	}
-	var r = route.Router
 	var sUrl = strings.Split(route.fullUrl, "/")
 	var urlBuf strings.Builder
 
 	if external {
-		if r.Subdomain != "" {
-			host = "http://" + r.Subdomain + "." + servername
+		if router.Subdomain != "" {
+			host = "http://" + router.Subdomain + "." + servername
 		} else {
 			host = "http://" + servername
 		}

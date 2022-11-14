@@ -17,25 +17,39 @@ type Meth struct {
 
 type Ctrl map[string]*Meth
 
-type Route struct {
-	Func
-	Methods
+// type Ctrl interface {
+// 	GET(*Ctx)
+// 	PUT(*Ctx)
+// 	HEAD(*Ctx)
+// 	POST(*Ctx)
+// 	TRACE(*Ctx)
+// 	PATCH(*Ctx)
+// 	DELETE(*Ctx)
+// 	CONNECT(*Ctx)
+// 	OPTIONS(*Ctx)
+// }
 
-	Url    string
-	Name   string
-	Schema any
-	Ctrl
-	*Cors
-	Middlewares
+type Route struct {
+	Url         string
+	Name        string
+	Func        Func
+	Ctrl        Ctrl
+	Cors        *Cors
+	Schema      any
+	Methods     Methods
+	Middlewares Middlewares
 
 	fullName string
 	fullUrl  string
 	urlRegex []*regexp.Regexp
-	Router   *Router
 }
 
 func (r *Route) compileUrl() {
-	for _, str := range strings.Split(r.fullUrl, "/") {
+	url := strings.TrimPrefix(r.fullUrl, "/")
+	url = strings.TrimSuffix(url, "/")
+	strs := strings.Split(url, "/")
+
+	for i, str := range strs {
 		if str == "" {
 			continue
 		}
@@ -46,9 +60,18 @@ func (r *Route) compileUrl() {
 			re.slash2.ReplaceAllString(str, "/")
 		}
 		if re.isVar.MatchString(str) {
-			str = re.str.ReplaceAllString(str, `([\x00-\x7F]+[^\\\/\s]+)`)
-			str = re.digit.ReplaceAllString(str, `(\d+)`)
-			str = re.filepath.ReplaceAllString(str, `([\/\w+.-]+)`)
+			if re.isVarOpt.MatchString(str) {
+				if i != len(strs)-1 {
+					l.err.Fatal("optional url var must be last")
+				}
+				str = re.str.ReplaceAllString(str, `([\x00-\x7F]+[^\\\/\s]+)?`)
+				str = re.digit.ReplaceAllString(str, `(\d+)?`)
+				str = re.filepath.ReplaceAllString(str, `([\/\w+.-]+)?`)
+			} else {
+				str = re.str.ReplaceAllString(str, `([\x00-\x7F]+[^\\\/\s]+)`)
+				str = re.digit.ReplaceAllString(str, `(\d+)`)
+				str = re.filepath.ReplaceAllString(str, `([\/\w+.-]+)`)
+			}
 		}
 		r.urlRegex = append(r.urlRegex, regexp.MustCompile(fmt.Sprintf("^%s$", str)))
 	}
@@ -102,14 +125,22 @@ func (r *Route) parse() {
 }
 
 func (r *Route) matchURL(ctx *Ctx, url string) bool {
-	urlSplit := strings.Split(strings.TrimPrefix(url, "/"), "/")
+	url = strings.TrimPrefix(url, "/")
+	url = strings.TrimSuffix(url, "/")
+
+	urlSplit := strings.Split(url, "/")
+
+	fmt.Println("aq")
+
 	if re.filepath.MatchString(r.fullUrl) {
 		if strings.HasPrefix(url, ctx.App.StaticUrlPath) {
 			return true
 		}
 		return false
 	}
-	if len(urlSplit) != len(r.urlRegex) {
+	lSplit := len(urlSplit)
+	lRegex := len(r.urlRegex)
+	if lSplit != lRegex || lSplit != lRegex-1 {
 		return false
 	}
 	for i, uRe := range r.urlRegex {
