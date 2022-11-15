@@ -1,10 +1,11 @@
 package slow
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -15,13 +16,13 @@ import (
 var (
 	l = newLogger()
 
+	appStack      []*App
 	servername    string
-	_secretKey    string
 	contextsNamed map[string]*Ctx
 )
 
+// Retur a new app with a default settings
 func NewApp() *App {
-
 	router := &Router{
 		_main:        true,
 		Name:         "",
@@ -59,10 +60,14 @@ type App struct {
 	building bool
 }
 
+// Parse the router and your routes
 func (app *App) build() {
 	if app.building {
 		return
 	}
+	appStack = append(appStack, app)
+	go app.parseHosts()
+
 	if app.Servername != "" {
 		servername = app.Servername
 	} else {
@@ -77,77 +82,72 @@ func (app *App) build() {
 	app.building = true
 }
 
-func (app *App) Mount(routes ...*Router) {
-	for _, route := range routes {
-		if route.Name == "" {
-			panic(fmt.Errorf("the routers must be named"))
-		} else if _, ok := app.routerByName[route.Name]; ok {
-			panic(fmt.Errorf("router '%s' already regitered", route.Name))
-		}
-		app.routers = append(app.routers, route)
+// read hosts file and create a regex of hosts and addrss
+func (app *App) parseHosts() {
+	_hosts := map[string]any{}
+	f, err := os.ReadFile("/etc/hosts")
+	if err != nil {
+		panic(err)
 	}
+	fStr := string(f)
+	for _, str := range strings.Split(fStr, "\n") {
+		if str == "" {
+			continue
+		}
+		str = strings.TrimSpace(str)
+		if strings.HasPrefix(str, "#") {
+			continue
+		}
+		var h string
+		var h2 string
+
+		if strings.Contains(str, "\t") {
+			hs := strings.Split(str, "\t")
+			h = hs[0]
+			if len(hs) > 1 {
+				h2 = hs[1]
+			}
+		} else {
+			hs := strings.Split(str, " ")
+			h = hs[0]
+			if len(hs) > 1 {
+				h2 = hs[1]
+			}
+		}
+		if h != "" {
+			_hosts[h] = nil
+		}
+		if h2 != "" {
+			_hosts[h2] = nil
+		}
+	}
+	if _, ok := _hosts["0.0.0.0"]; !ok {
+		_hosts["0.0.0.0"] = nil
+	}
+
+	hSlice := []string{}
+	for k := range _hosts {
+		hSlice = append(hSlice, k)
+	}
+	strH := strings.Join(hSlice, "|")
+	hosts = regexp.MustCompile(`^(` + strH + `)((\:\d+)?)$`)
 }
 
-func (app *App) UrlFor(name string, external bool, params map[string]string) string {
-	var (
-		host   = ""
-		route  *Route
-		router *Router
-	)
-	if r, ok := app.routesByName[name]; ok {
-		route = r
-	}
-	if strings.Contains(name, ".") {
-		routerName := strings.Split(name, ",")[0]
-		router = app.routerByName[routerName]
-	} else {
-		router = app.Router
-	}
-
-	if route == nil {
-		panic(errors.New("route '" + name + "' is not found"))
-	}
-	var sUrl = strings.Split(route.fullUrl, "/")
-	var urlBuf strings.Builder
-
-	if external {
-		if router.Subdomain != "" {
-			host = "http://" + router.Subdomain + "." + servername
-		} else {
-			host = "http://" + servername
+// register the rouuter in app
+func (app *App) Mount(routers ...*Router) {
+	for _, router := range routers {
+		if router.Name == "" {
+			panic(fmt.Errorf("the routers must be named"))
+		} else if _, ok := app.routerByName[router.Name]; ok {
+			panic(fmt.Errorf("router '%s' already regitered", router.Name))
 		}
+		app.routerByName[router.Name] = router
+		app.routers = append(app.routers, router)
 	}
-	for _, str := range sUrl {
-		if re.isVar.MatchString(str) {
-			fname := re.getVarName(str)
-			value, ok := params[fname]
-			if !ok {
-				panic(errors.New("Route '" + name + "' needs parameter '" + str + "' but not passed"))
-			}
-			urlBuf.WriteString("/" + value)
-			delete(params, fname)
-		} else {
-			urlBuf.WriteString("/" + str)
-		}
-	}
-	if len(params) > 0 {
-		urlBuf.WriteString("?")
-		for k, v := range params {
-			urlBuf.WriteString(k + "=" + v + "&")
-		}
-	}
-	url := strings.TrimSuffix(urlBuf.String(), "&")
-	url = re.slash2.ReplaceAllString(url, "/")
-	url = re.dot2.ReplaceAllString(url, ".")
-	return strings.TrimSuffix(host, "/") + url
 }
 
 func (app *App) execRoute(ctx *Ctx) {
 	rsp := ctx.Response
-	rq := ctx.Request
-	if app.BeforeRequest != nil {
-		app.BeforeRequest(ctx)
-	}
 	defer func() {
 		err := recover()
 		if err == HttpAbort || err == nil {
@@ -185,21 +185,25 @@ func (app *App) execRoute(ctx *Ctx) {
 			}
 		}
 	}()
-	for _, mid := range rq.MatchInfo.Router.Middlewares {
+	if app.BeforeRequest != nil {
+		app.BeforeRequest(ctx)
+	}
+	for _, mid := range ctx.MatchInfo.Router().Middlewares {
 		mid(ctx)
 	}
-	for _, mid := range rq.MatchInfo.Route.Middlewares {
+	for _, mid := range ctx.MatchInfo.Route().Middlewares {
 		mid(ctx)
 	}
 	// if raise a error in any mid, Route.Func not is executed.
-	rq.MatchInfo.Func(ctx)
+	ctx.MatchInfo.Func(ctx)
+
+	// if raise a error in any mid or in route func, app.AfterRequest not is executed.
 	if app.AfterRequest != nil {
 		app.AfterRequest(ctx)
 	}
 }
 
 func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
-
 	ctx := NewCtx(app, req.Context())
 
 	rsp := NewResponse(wr, ctx.id)
@@ -219,7 +223,7 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	mi := rq.MatchInfo
+	mi := ctx.MatchInfo
 	for _, router := range app.routers {
 		if router.Match(ctx) {
 			break
@@ -228,7 +232,7 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	if mi.Match {
 		if rq.Raw.Method == "OPTIONS" {
 			rsp.StatusCode = 200
-			strMeths := strings.Join(mi.Route.Methods, ", ")
+			strMeths := strings.Join(mi.Route().Cors.AllowMethods, ", ")
 			rsp.Headers.Set("Access-Control-Allow-Methods", strMeths)
 
 			rsp._afterRequest()
@@ -237,7 +241,7 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 			fmt.Fprint(rsp.raw, "")
 		} else {
 			rq.Query = req.URL.Query()
-			rq.Args = re.getUrlValues(mi.Route.fullUrl, req.URL.Path)
+			rq.Args = re.getUrlValues(mi.Route().fullUrl, req.URL.Path)
 			app.execRoute(ctx)
 		}
 	} else if mi.MethodNotAllowed != nil {

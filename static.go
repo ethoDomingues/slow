@@ -20,6 +20,9 @@ func ServeFile(ctx *Ctx) {
 	d := http.Dir(dir)
 	if f, err := d.Open(file); err == nil {
 		defer f.Close()
+		if fStat, err := f.Stat(); err != nil || fStat.IsDir() {
+			rsp.NotFound()
+		}
 		io.Copy(rsp.Body, f)
 		ext := file
 		splitFilename := strings.Split(file, ".")

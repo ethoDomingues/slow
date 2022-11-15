@@ -2,6 +2,7 @@ package slow
 
 import (
 	"fmt"
+	"net"
 	"regexp"
 	"strings"
 )
@@ -54,7 +55,7 @@ func (r *Router) parse() {
 		r.routesByName[route.fullName] = route
 
 	}
-
+	// DYNAMIC SUBDOMAINS ARE NOT A GOOD IDEA
 	if r.Subdomain != "" {
 		sub := r.Subdomain
 		if re.digit.MatchString(sub) {
@@ -63,30 +64,34 @@ func (r *Router) parse() {
 		if re.filepath.MatchString(sub) {
 			l.err.Fatalf("router subdomain dont accept 'filepath' varible. Router: '%s'", r.Name)
 		}
-		if re.isVar.MatchString(sub) {
-			if re.isVarOpt.MatchString(sub) {
-				sub = re.str.ReplaceAllString(sub, `(\w+)?`)
-			} else {
-				sub = re.str.ReplaceAllString(sub, `(\w+)`)
-			}
-		}
-		r.subdomainRegex = regexp.MustCompile(`^(` + sub + "[.]" + servername + `)$`)
-	} else {
-		r.subdomainRegex = regexp.MustCompile(`^(` + servername + `)$`)
+		r.subdomainRegex = regexp.MustCompile(sub)
 	}
 }
 
 func (r *Router) Match(ctx *Ctx) bool {
 	rq := ctx.Request
+	rqUrl := rq.Raw.Host
 	if r.subdomainRegex != nil {
-
-		if !r.subdomainRegex.MatchString(rq.Raw.Host) {
+		if net.ParseIP(rqUrl) != nil {
+			return false
+		} else if hosts.MatchString(rqUrl) {
 			return false
 		}
+
+		if !strings.Contains(rqUrl, ".") {
+			return false
+		}
+		u := strings.Split(rqUrl, ".")[0]
+		if !r.subdomainRegex.MatchString(u) {
+			return false
+		}
+	} else if !hosts.MatchString(rqUrl) {
+		return false
 	}
+
 	for _, route := range r.Routes {
 		if route.Match(ctx) {
-			ctx.Request.MatchInfo.Router = r
+			ctx.MatchInfo.router = r.Name
 			return true
 		}
 	}

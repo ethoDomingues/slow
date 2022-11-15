@@ -34,10 +34,9 @@ type File struct {
 
 func NewRequest(req *http.Request, ctxID string) *Request {
 	return &Request{
-		ctx:       ctxID,
-		Raw:       req,
-		Method:    req.Method,
-		MatchInfo: &MatchInfo{},
+		ctx:    ctxID,
+		Raw:    req,
+		Method: req.Method,
 
 		Args:    map[string]string{},
 		Mime:    map[string]string{},
@@ -48,7 +47,6 @@ func NewRequest(req *http.Request, ctxID string) *Request {
 }
 
 type Request struct {
-	*MatchInfo
 	Raw         *http.Request
 	ctx         string
 	Body        string
@@ -118,7 +116,8 @@ func (r *Request) parseBody() {
 }
 
 func (r *Request) RequestURL() string {
-	return r.UrlFor(r.MatchInfo.Route.fullName, true, r.Args)
+	route := r.Ctx().Route()
+	return UrlFor(route.fullName, true, r.Args)
 }
 
 func (r *Request) Parse() {
@@ -128,7 +127,3 @@ func (r *Request) Parse() {
 }
 
 func (r *Request) Ctx() *Ctx { return contextsNamed[r.ctx] }
-
-func (r *Request) UrlFor(name string, external bool, params map[string]string) string {
-	return r.Ctx().App.UrlFor(name, external, params)
-}

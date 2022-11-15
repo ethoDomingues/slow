@@ -12,11 +12,24 @@ var (
 )
 
 type MatchInfo struct {
-	MethodNotAllowed error
-	Match            bool
 	Func
-	Route  *Route
-	Router *Router
+
+	Match            bool
+	MethodNotAllowed error
+
+	ctx    string
+	route  string
+	router string
+}
+
+func (m *MatchInfo) Ctx() *Ctx { return contextsNamed[m.ctx] }
+
+func (m *MatchInfo) Router() *Router {
+	return m.Ctx().App.routerByName[m.router]
+}
+
+func (m *MatchInfo) Route() *Route {
+	return m.Ctx().App.routesByName[m.route]
 }
 
 type _re struct {
@@ -31,6 +44,7 @@ type _re struct {
 }
 
 var (
+	hosts      *regexp.Regexp
 	isStr      = regexp.MustCompile(`{\w+(:str)?[?]?}`)
 	isVar      = regexp.MustCompile(`{\w+(\:(int|str|filepath))?[?]?}`)
 	isVarOpt   = regexp.MustCompile(`{\w+(\:(int|str))?[\?]}`)
@@ -38,7 +52,6 @@ var (
 	isFilepath = regexp.MustCompile(`{\w+:filepath}`)
 
 	dot2      = regexp.MustCompile(`[.]{2,}`)
-	isIP      = regexp.MustCompile(`^([0,255][.][0,255][.][0,255][.][0,255])((:[0,65535])?)$`)
 	slash2    = regexp.MustCompile(`[\/]{2,}`)
 	reMethods = regexp.MustCompile("^(?i)(GET|PUT|HEAD|POST|TRACE|PATCH|DELETE|CONNECT|OPTIONS)$")
 
@@ -60,15 +73,21 @@ func (r *_re) getVarName(str string) string {
 		str = strings.Replace(str, "}", "", -1)
 		str = strings.Split(str, ":")[0]
 	}
+	if strings.HasSuffix(str, "?") {
+		return strings.TrimSuffix(str, "?")
+	}
 	return str
 }
 
 func (r _re) getUrlValues(url, requestUrl string) map[string]string {
 	req := strings.Split(requestUrl, "/")
 	kv := map[string]string{}
+
 	for i, str := range strings.Split(url, "/") {
-		if re.isVar.MatchString(str) {
-			kv[re.getVarName(str)] = req[i]
+		if i < len(req) {
+			if re.isVar.MatchString(str) {
+				kv[re.getVarName(str)] = req[i]
+			}
 		}
 	}
 	return kv
