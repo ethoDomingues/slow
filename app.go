@@ -152,6 +152,11 @@ func (app *App) execRoute(ctx *Ctx) {
 	defer func() {
 		err := recover()
 		if err == HttpAbort || err == nil {
+			// if raise a error in any mid or in route func, app.AfterRequest not is executed.
+			if app.AfterRequest != nil {
+				app.AfterRequest(ctx)
+			}
+
 			if len(ctx.Session.jwt.Payload) > 0 {
 				s := ctx.Session.Save()
 				rsp.SetCookie(s)
@@ -181,27 +186,23 @@ func (app *App) execRoute(ctx *Ctx) {
 			}
 			rsp.raw.WriteHeader(rsp.StatusCode)
 			fmt.Fprint(rsp.raw, statusText)
-			if app.TearDownRequest != nil {
-				app.TearDownRequest(ctx)
-			}
 		}
 	}()
+
 	if app.BeforeRequest != nil {
 		app.BeforeRequest(ctx)
 	}
+
 	for _, mid := range ctx.MatchInfo.Router().Middlewares {
 		mid(ctx)
 	}
+
 	for _, mid := range ctx.MatchInfo.Route().Middlewares {
 		mid(ctx)
 	}
+
 	// if raise a error in any mid, Route.Func not is executed.
 	ctx.MatchInfo.Func(ctx)
-
-	// if raise a error in any mid or in route func, app.AfterRequest not is executed.
-	if app.AfterRequest != nil {
-		app.AfterRequest(ctx)
-	}
 }
 
 func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
@@ -253,6 +254,9 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 		rsp.StatusCode = 404
 		rsp.raw.WriteHeader(404)
 		fmt.Fprint(rsp.raw, "404 Not Found")
+	}
+	if app.TearDownRequest != nil {
+		app.TearDownRequest(ctx)
 	}
 	l.LogRequest(ctx.id)
 }

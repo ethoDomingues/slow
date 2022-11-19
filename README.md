@@ -24,7 +24,8 @@ func main() {
 
 func helloWorld(ctx *slow.Ctx) {
 	rsp := ctx.Response
-	rsp.JSON(map[string]any{"Hello": "World"}, 200)
+	hello := map[string]any{"Hello": "World"}
+	rsp.JSON(hello, 200)
 }
 
 func helloUser(ctx *slow.Ctx) {
