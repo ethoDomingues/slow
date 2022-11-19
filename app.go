@@ -18,6 +18,7 @@ var (
 
 	appStack      []*App
 	servername    string
+	localAddress  = GetOutboundIP()
 	contextsNamed map[string]*Ctx
 )
 

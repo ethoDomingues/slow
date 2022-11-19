@@ -3,6 +3,8 @@ package slow
 import (
 	"errors"
 	"fmt"
+	"log"
+	"net"
 	"reflect"
 	"runtime"
 	"strings"
@@ -46,6 +48,8 @@ func UrlFor(name string, external bool, params map[string]string) string {
 		router *Router
 		app    *App
 	)
+
+	// Get Route & Router
 	lenStack := len(appStack)
 	if lenStack > 0 {
 		app = appStack[lenStack-1]
@@ -66,29 +70,38 @@ func UrlFor(name string, external bool, params map[string]string) string {
 	if route == nil {
 		panic(errors.New("route '" + name + "' is not found"))
 	}
+
+	// Pre Build
 	var sUrl = strings.Split(route.fullUrl, "/")
 	var urlBuf strings.Builder
 
+	// Build Host
 	if external {
 		if router.Subdomain != "" {
 			host = "http://" + router.Subdomain + "." + servername
 		} else {
-			host = "http://" + servername
+			host = "http://" + localAddress.String()
 		}
 	}
+
+	// Build Url
 	for _, str := range sUrl {
 		if re.isVar.MatchString(str) {
 			fname := re.getVarName(str)
 			value, ok := params[fname]
 			if !ok {
-				panic(errors.New("Route '" + name + "' needs parameter '" + str + "' but not passed"))
+				if !re.isVarOpt.MatchString(str) {
+					panic(errors.New("Route '" + name + "' needs parameter '" + str + "' but not passed"))
+				}
+			} else {
+				urlBuf.WriteString("/" + value)
+				delete(params, fname)
 			}
-			urlBuf.WriteString("/" + value)
-			delete(params, fname)
 		} else {
 			urlBuf.WriteString("/" + str)
 		}
 	}
+	// Build Query
 	if len(params) > 0 {
 		urlBuf.WriteString("?")
 		for k, v := range params {
@@ -99,4 +112,17 @@ func UrlFor(name string, external bool, params map[string]string) string {
 	url = re.slash2.ReplaceAllString(url, "/")
 	url = re.dot2.ReplaceAllString(url, ".")
 	return strings.TrimSuffix(host, "/") + url
+}
+
+// Get preferred outbound ip of this machine
+func GetOutboundIP() net.IP {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP
 }

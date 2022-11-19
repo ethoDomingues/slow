@@ -71,22 +71,32 @@ func (r *Router) parse() {
 func (r *Router) Match(ctx *Ctx) bool {
 	rq := ctx.Request
 	rqUrl := rq.Raw.Host
+
+	// if o router has a subdomain...
 	if r.subdomainRegex != nil {
+
+		// and the o request address is a ip...
 		if net.ParseIP(rqUrl) != nil {
-			return false
-		} else if hosts.MatchString(rqUrl) {
 			return false
 		}
 
+		// and the o request address dont contais dot...
 		if !strings.Contains(rqUrl, ".") {
 			return false
 		}
+
 		u := strings.Split(rqUrl, ".")[0]
+		// and the o request address[0] dont match...
 		if !r.subdomainRegex.MatchString(u) {
 			return false
 		}
+
+		// else if the reauest adress dont has in the request file
 	} else if !hosts.MatchString(rqUrl) {
-		return false
+		// and the o request address is != a IP
+		if net.ParseIP(rqUrl) == nil {
+			return false
+		}
 	}
 
 	for _, route := range r.Routes {
