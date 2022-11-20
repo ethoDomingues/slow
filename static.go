@@ -2,6 +2,7 @@ package slow
 
 import (
 	"io"
+	"mime"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -24,17 +25,14 @@ func ServeFile(ctx *Ctx) {
 			rsp.NotFound()
 		}
 		io.Copy(rsp.Body, f)
-		ext := file
-		splitFilename := strings.Split(file, ".")
-		if len(splitFilename) > 1 {
-			ext = splitFilename[len(splitFilename)-1]
-		}
-		ct, ok := TypeByExtension[ext]
-		if !ok {
-			ct = getTypebyFilename(file)
+
+		ctype := mime.TypeByExtension(filepath.Ext(file))
+
+		if ctype == "application/octet-stream" {
+			ctype = http.DetectContentType(rsp.Body.Bytes())
 		}
 
-		rsp.Headers.Set("Content-Type", ct)
+		rsp.Headers.Set("Content-Type", ctype)
 		rsp.Close()
 	} else {
 		rsp.NotFound()
