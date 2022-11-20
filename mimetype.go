@@ -2,7 +2,7 @@ package slow
 
 import "strings"
 
-func getTypebyFilename(filename string) string {
+func GetTypebyFilename(filename string) string {
 	for ext, typ := range TypeByExtension {
 		if strings.HasSuffix(filename, ext) {
 			return typ

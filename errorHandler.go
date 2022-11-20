@@ -2,4 +2,4 @@ package slow
 
 import "errors"
 
-var HttpAbort = errors.New("aborted")
+var ErrHttpAbort = errors.New("aborted")

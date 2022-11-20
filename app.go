@@ -151,7 +151,7 @@ func (app *App) execRoute(ctx *Ctx) {
 	rsp := ctx.Response
 	defer func() {
 		err := recover()
-		if err == HttpAbort || err == nil {
+		if err == ErrHttpAbort || err == nil {
 			// if raise a error in any mid or in route func, app.AfterRequest not is executed.
 			if app.AfterRequest != nil {
 				app.AfterRequest(ctx)

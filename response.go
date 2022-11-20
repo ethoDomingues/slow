@@ -65,7 +65,7 @@ func (r *Response) _afterRequest() {
 }
 
 func (r *Response) Close() {
-	panic(HttpAbort)
+	panic(ErrHttpAbort)
 }
 
 func (r *Response) Ctx() *Ctx { return contextsNamed[r.ctx] }
@@ -76,7 +76,7 @@ func (r *Response) Abort(code int) {
 	r.Body.Reset()
 	r.Body.WriteString(fmt.Sprint(code, " ", http.StatusText(code)))
 	r.StatusCode = code
-	panic(HttpAbort)
+	panic(ErrHttpAbort)
 }
 
 func (r *Response) Redirect(url string) {
@@ -90,7 +90,7 @@ func (r *Response) Redirect(url string) {
 	}
 	r.StatusCode = 302
 	r.Body.WriteString("<a href=\"" + HtmlEscape(url) + "\"> Manual Redirect </a>.\n")
-	panic(HttpAbort)
+	panic(ErrHttpAbort)
 }
 
 func (r *Response) JSON(body any, code int) {
@@ -103,7 +103,7 @@ func (r *Response) JSON(body any, code int) {
 	r.StatusCode = code
 	r.Headers.Set("Content-Type", "application/json")
 	r.Body.Write(j)
-	panic(HttpAbort)
+	panic(ErrHttpAbort)
 }
 
 func (r *Response) HTML(body string, code int) {
@@ -112,7 +112,7 @@ func (r *Response) HTML(body string, code int) {
 	r.StatusCode = code
 	r.Headers.Set("Content-Type", "text/html")
 	r.Body.WriteString(body)
-	panic(HttpAbort)
+	panic(ErrHttpAbort)
 }
 
 func (r *Response) Ok()                  { r.Abort(200) }
