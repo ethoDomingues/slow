@@ -31,7 +31,7 @@ type Response struct {
 	Headers *Headers
 }
 
-func (r *Response) _afterRequest() {
+func (r *Response) parseHeaders() {
 	ctx := r.Ctx()
 	method := ctx.Request.Method
 	routerCors := ctx.MatchInfo.Router().Cors

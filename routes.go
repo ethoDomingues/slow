@@ -9,6 +9,7 @@ import (
 type Func func(*Ctx)
 type Methods []string
 type Schema any
+
 type Meth struct {
 	Func
 	Method string
@@ -76,7 +77,12 @@ func (r *Route) parse() {
 	}
 
 	r.compileUrl()
-	ctrl := MapCtrl{"OPTIONS": nil}
+	ctrl := MapCtrl{
+		"OPTIONS": &Meth{
+			Func:   optionsResponse,
+			Method: "OPTIONS",
+		},
+	}
 
 	strMth := map[string]any{}
 	for verb, meth := range r.MapCtrl {
@@ -103,9 +109,11 @@ func (r *Route) parse() {
 		}
 		strMth[v] = nil
 	}
-	if _, ok := r.MapCtrl["GET"]; ok {
-		r.MapCtrl["HEAD"] = r.MapCtrl["GET"]
-		strMth["HEAD"] = nil
+	if _, ok := r.MapCtrl["HEAD"]; !ok {
+		if _, ok := r.MapCtrl["GET"]; ok {
+			r.MapCtrl["HEAD"] = r.MapCtrl["GET"]
+			strMth["HEAD"] = nil
+		}
 	}
 
 	lmths := []string{"OPTIONS"}
@@ -164,14 +172,26 @@ func (r *Route) Match(ctx *Ctx) bool {
 
 	if meth, ok := r.MapCtrl[m]; ok {
 		mi.MethodNotAllowed = nil
+
+		mi.Func = meth.Func
 		mi.Match = true
 		mi.route = r.fullName
-		if m != "OPTIONS" {
-			mi.Func = meth.Func
-		}
+
 		return true
 	}
 	mi.MethodNotAllowed = ErrorMethodMismatch
 	mi.route = ""
 	return false
+}
+
+func optionsResponse(ctx *Ctx) {
+	rsp := ctx.Response
+	mi := ctx.MatchInfo
+
+	rsp.StatusCode = 200
+	strMeths := strings.Join(mi.Route().Cors.AllowMethods, ", ")
+	rsp.Headers.Set("Access-Control-Allow-Methods", strMeths)
+
+	rsp.parseHeaders()
+	rsp.Headers.Save(rsp.raw)
 }

@@ -19,7 +19,7 @@ func NewRouter(name string, cfg map[string]string) *Router {
 }
 
 type Router struct {
-	_main bool
+	is_main bool
 
 	Name,
 	Prefix,
@@ -34,9 +34,25 @@ type Router struct {
 }
 
 func (r *Router) parse() {
-	if r.Name == "" && !r._main {
+	if r.Name == "" && !r.is_main {
 		panic(fmt.Errorf("the routers must be named"))
 	}
+
+	// DYNAMIC SUBDOMAINS ARE NOT A GOOD IDEA
+	if r.Subdomain != "" {
+		if servername == "" {
+			l.err.Fatal("to use subdomains you need to first add a ServerName in the 'app'")
+		}
+		sub := r.Subdomain
+		if re.digit.MatchString(sub) {
+			l.err.Fatalf("router subdomain dont accept 'int' varible. Router: '%s'", r.Name)
+		}
+		if re.filepath.MatchString(sub) {
+			l.err.Fatalf("router subdomain dont accept 'filepath' varible. Router: '%s'", r.Name)
+		}
+		r.subdomainRegex = regexp.MustCompile(sub)
+	}
+
 	for _, route := range r.Routes {
 		if r.Name != "" {
 			route.fullName = r.Name + "." + route.Name
@@ -54,17 +70,6 @@ func (r *Router) parse() {
 		route.parse()
 		r.routesByName[route.fullName] = route
 
-	}
-	// DYNAMIC SUBDOMAINS ARE NOT A GOOD IDEA
-	if r.Subdomain != "" {
-		sub := r.Subdomain
-		if re.digit.MatchString(sub) {
-			l.err.Fatalf("router subdomain dont accept 'int' varible. Router: '%s'", r.Name)
-		}
-		if re.filepath.MatchString(sub) {
-			l.err.Fatalf("router subdomain dont accept 'filepath' varible. Router: '%s'", r.Name)
-		}
-		r.subdomainRegex = regexp.MustCompile(sub)
 	}
 }
 
@@ -88,13 +93,6 @@ func (r *Router) Match(ctx *Ctx) bool {
 		u := strings.Split(rqUrl, ".")[0]
 		// and the o request address[0] dont match...
 		if !r.subdomainRegex.MatchString(u) {
-			return false
-		}
-
-		// else if the reauest adress dont has in the request file
-	} else if !hosts.MatchString(rqUrl) {
-		// and the o request address is != a IP
-		if net.ParseIP(rqUrl) == nil {
 			return false
 		}
 	}
@@ -149,11 +147,74 @@ func (r *Router) Get(url string, f Func) {
 	})
 }
 
+func (r *Router) HEAD(url string, f Func) {
+	r.addRoute(&Route{
+		Url:     url,
+		Func:    f,
+		Name:    GetFunctionName(f),
+		Methods: []string{"HEAD"},
+	})
+}
+
 func (r *Router) Post(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
 		Name:    GetFunctionName(f),
 		Methods: []string{"POST"},
+	})
+}
+
+func (r *Router) Put(url string, f Func) {
+	r.addRoute(&Route{
+		Url:     url,
+		Func:    f,
+		Name:    GetFunctionName(f),
+		Methods: []string{"PUT"},
+	})
+}
+
+func (r *Router) Delete(url string, f Func) {
+	r.addRoute(&Route{
+		Url:     url,
+		Func:    f,
+		Name:    GetFunctionName(f),
+		Methods: []string{"DELETE"},
+	})
+}
+
+func (r *Router) CONNECT(url string, f Func) {
+	r.addRoute(&Route{
+		Url:     url,
+		Func:    f,
+		Name:    GetFunctionName(f),
+		Methods: []string{"CONNECT"},
+	})
+}
+
+func (r *Router) OPTIONS(url string, f Func) {
+	r.addRoute(&Route{
+		Url:     url,
+		Func:    f,
+		Name:    GetFunctionName(f),
+		Methods: []string{"OPTIONS"},
+	})
+}
+
+func (r *Router) TRACE(url string, f Func) {
+	r.addRoute(&Route{
+		Url:     url,
+		Func:    f,
+		Name:    GetFunctionName(f),
+		Methods: []string{"TRACE"},
+	})
+}
+
+func (r *Router) PATCH(url string, f Func) {
+	r.addRoute(&Route{
+		Url:     url,
+		Func:    f,
+		Name:    GetFunctionName(f),
+		Methods: []string{"PATCH"},
 	})
 }

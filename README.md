@@ -1,6 +1,6 @@
 # Slow
 
-## [Com a correta configuraçao do go](https://go.dev/doc/install) 
+## [Com a correta configuração do go](https://go.dev/doc/install) 
 
 ```sh
 $ go get github.com/ethoDomingues/slow

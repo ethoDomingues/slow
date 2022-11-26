@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -25,9 +23,9 @@ var (
 // Retur a new app with a default settings
 func NewApp() *App {
 	router := &Router{
-		_main:        true,
 		Name:         "",
 		Routes:       []*Route{},
+		is_main:      true,
 		routesByName: map[string]*Route{},
 	}
 	app := &App{
@@ -58,80 +56,28 @@ type App struct {
 	AfterRequest    Func
 	TearDownRequest Func
 
-	building bool
+	built bool
 }
 
 // Parse the router and your routes
 func (app *App) build() {
-	if app.building {
+	localAddress = GetOutboundIP()
+	servername = app.Servername
+	if app.built {
 		return
 	}
-	appStack = append(appStack, app)
-	go app.parseHosts()
 
-	if app.Servername != "" {
-		servername = app.Servername
-	} else {
-		servername = "localhost:5000"
-	}
+	appStack = append(appStack, app)
+
+	// go app.parseHosts()
+
 	for _, router := range app.routers {
 		router.parse()
 		if router.Name != "" {
 			maps.Copy(app.routesByName, router.routesByName)
 		}
 	}
-	app.building = true
-}
-
-// read hosts file and create a regex of hosts and addrss
-func (app *App) parseHosts() {
-	_hosts := map[string]any{}
-	f, err := os.ReadFile("/etc/hosts")
-	if err != nil {
-		panic(err)
-	}
-	fStr := string(f)
-	for _, str := range strings.Split(fStr, "\n") {
-		if str == "" {
-			continue
-		}
-		str = strings.TrimSpace(str)
-		if strings.HasPrefix(str, "#") {
-			continue
-		}
-		var h string
-		var h2 string
-
-		if strings.Contains(str, "\t") {
-			hs := strings.Split(str, "\t")
-			h = hs[0]
-			if len(hs) > 1 {
-				h2 = hs[1]
-			}
-		} else {
-			hs := strings.Split(str, " ")
-			h = hs[0]
-			if len(hs) > 1 {
-				h2 = hs[1]
-			}
-		}
-		if h != "" {
-			_hosts[h] = nil
-		}
-		if h2 != "" {
-			_hosts[h2] = nil
-		}
-	}
-	if _, ok := _hosts["0.0.0.0"]; !ok {
-		_hosts["0.0.0.0"] = nil
-	}
-
-	hSlice := []string{}
-	for k := range _hosts {
-		hSlice = append(hSlice, k)
-	}
-	strH := strings.Join(hSlice, "|")
-	hosts = regexp.MustCompile(`^(` + strH + `)((\:\d+)?)$`)
+	app.built = true
 }
 
 // register the rouuter in app
@@ -149,6 +95,7 @@ func (app *App) Mount(routers ...*Router) {
 
 func (app *App) execRoute(ctx *Ctx) {
 	rsp := ctx.Response
+	rq := ctx.Request
 	defer func() {
 		err := recover()
 		if err == ErrHttpAbort || err == nil {
@@ -161,8 +108,10 @@ func (app *App) execRoute(ctx *Ctx) {
 				s := ctx.Session.Save()
 				rsp.SetCookie(s)
 			}
-			rsp._afterRequest()
-			rsp.Headers.Save(rsp.raw)
+			if rq.Method != "OPTIONS" {
+				rsp.parseHeaders()
+				rsp.Headers.Save(rsp.raw)
+			}
 			rsp.raw.WriteHeader(rsp.StatusCode)
 			fmt.Fprint(rsp.raw, rsp.Body.String())
 		} else {
@@ -232,20 +181,9 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 		}
 	}
 	if mi.Match {
-		if rq.Raw.Method == "OPTIONS" {
-			rsp.StatusCode = 200
-			strMeths := strings.Join(mi.Route().Cors.AllowMethods, ", ")
-			rsp.Headers.Set("Access-Control-Allow-Methods", strMeths)
-
-			rsp._afterRequest()
-
-			rsp.Headers.Save(rsp.raw)
-			fmt.Fprint(rsp.raw, "")
-		} else {
-			rq.Query = req.URL.Query()
-			rq.Args = re.getUrlValues(mi.Route().fullUrl, req.URL.Path)
-			app.execRoute(ctx)
-		}
+		rq.Query = req.URL.Query()
+		rq.Args = re.getUrlValues(mi.Route().fullUrl, req.URL.Path)
+		app.execRoute(ctx)
 	} else if mi.MethodNotAllowed != nil {
 		rsp.StatusCode = 405
 		rsp.raw.WriteHeader(405)
