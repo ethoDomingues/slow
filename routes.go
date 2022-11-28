@@ -79,7 +79,6 @@ func (r *Route) parse() {
 	r.compileUrl()
 	ctrl := MapCtrl{
 		"OPTIONS": &Meth{
-			Func:   optionsResponse,
 			Method: "OPTIONS",
 		},
 	}
@@ -173,7 +172,9 @@ func (r *Route) Match(ctx *Ctx) bool {
 	if meth, ok := r.MapCtrl[m]; ok {
 		mi.MethodNotAllowed = nil
 
-		mi.Func = meth.Func
+		if meth.Func != nil {
+			mi.Func = meth.Func
+		}
 		mi.Match = true
 		mi.route = r.fullName
 
@@ -182,16 +183,4 @@ func (r *Route) Match(ctx *Ctx) bool {
 	mi.MethodNotAllowed = ErrorMethodMismatch
 	mi.route = ""
 	return false
-}
-
-func optionsResponse(ctx *Ctx) {
-	rsp := ctx.Response
-	mi := ctx.MatchInfo
-
-	rsp.StatusCode = 200
-	strMeths := strings.Join(mi.Route().Cors.AllowMethods, ", ")
-	rsp.Headers.Set("Access-Control-Allow-Methods", strMeths)
-
-	rsp.parseHeaders()
-	rsp.Headers.Save(rsp.raw)
 }

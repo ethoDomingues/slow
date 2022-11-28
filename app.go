@@ -1,6 +1,7 @@
 package slow
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -18,9 +19,10 @@ var (
 	servername    string
 	localAddress  = GetOutboundIP()
 	contextsNamed map[string]*Ctx
+	listenInAll   bool
 )
 
-// Retur a new app with a default settings
+// Return a new app with a default settings
 func NewApp() *App {
 	router := &Router{
 		Name:         "",
@@ -57,6 +59,7 @@ type App struct {
 	TearDownRequest Func
 
 	built bool
+	srv   *http.Server
 }
 
 // Parse the router and your routes
@@ -96,6 +99,7 @@ func (app *App) Mount(routers ...*Router) {
 func (app *App) execRoute(ctx *Ctx) {
 	rsp := ctx.Response
 	rq := ctx.Request
+
 	defer func() {
 		err := recover()
 		if err == ErrHttpAbort || err == nil {
@@ -137,24 +141,28 @@ func (app *App) execRoute(ctx *Ctx) {
 			fmt.Fprint(rsp.raw, statusText)
 		}
 	}()
+	if ctx.MatchInfo.Func == nil && rq.Method == "OPTIONS" {
+		optionsHandler(ctx)
+	} else {
+		if app.BeforeRequest != nil {
+			app.BeforeRequest(ctx)
+		}
 
-	if app.BeforeRequest != nil {
-		app.BeforeRequest(ctx)
+		for _, mid := range ctx.MatchInfo.Router().Middlewares {
+			mid(ctx)
+		}
+
+		for _, mid := range ctx.MatchInfo.Route().Middlewares {
+			mid(ctx)
+		}
+
+		// if raise a error in any mid, Route.Func not is executed.
+		ctx.MatchInfo.Func(ctx)
 	}
-
-	for _, mid := range ctx.MatchInfo.Router().Middlewares {
-		mid(ctx)
-	}
-
-	for _, mid := range ctx.MatchInfo.Route().Middlewares {
-		mid(ctx)
-	}
-
-	// if raise a error in any mid, Route.Func not is executed.
-	ctx.MatchInfo.Func(ctx)
 }
 
 func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
+	// here begins the request
 	ctx := NewCtx(app, req.Context())
 
 	rsp := NewResponse(wr, ctx.id)
@@ -166,7 +174,7 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	contextsNamed[ctx.id] = ctx
 	defer delete(contextsNamed, ctx.id)
 
-	rq.Parse()
+	rq.parseRequest()
 
 	if app.SecretKey != "" {
 		if c, ok := rq.Cookies["session"]; ok {
@@ -193,16 +201,30 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 		rsp.raw.WriteHeader(404)
 		fmt.Fprint(rsp.raw, "404 Not Found")
 	}
+
 	if app.TearDownRequest != nil {
 		app.TearDownRequest(ctx)
 	}
 	l.LogRequest(ctx.id)
+	// here, the request is finished
 }
 
 func (app *App) Listen() {
+	var port int
+	var address string
+
+	flag.StringVar(&address, "address", "localhost", "address of server listen. default: localhost")
+	flag.IntVar(&port, "port", 5000, "port of server listen. default: 5000")
+
+	flag.Parse()
+
 	app.build()
-	srv := &http.Server{
-		Addr:           ":5000",
+	if address == "0.0.0.0" {
+		listenInAll = true
+	}
+
+	app.srv = &http.Server{
+		Addr:           address + ":" + fmt.Sprint(port),
 		Handler:        app,
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
@@ -211,8 +233,15 @@ func (app *App) Listen() {
 	if contextsNamed == nil {
 		contextsNamed = map[string]*Ctx{}
 	}
-	l.Deafault("Server is linsten in", srv.Addr)
-	log.Fatal(srv.ListenAndServe())
+	if listenInAll {
+		l.Default("Server is listening in all address")
+		l.info.Printf("          listening in: %s:%d", localAddress, port)
+		l.info.Printf("          listening in: 127.0.0.1:%d", port)
+	} else {
+		l.Default("Server is linsten in", app.srv.Addr)
+	}
+	fmt.Println()
+	log.Fatal(app.srv.ListenAndServe())
 }
 
 func (app *App) listRoutes() {
@@ -258,3 +287,15 @@ func (app *App) listRoutes() {
 }
 
 func (app *App) ShowRoutes() { app.listRoutes() }
+
+func optionsHandler(ctx *Ctx) {
+	rsp := ctx.Response
+	mi := ctx.MatchInfo
+
+	rsp.StatusCode = 200
+	strMeths := strings.Join(mi.Route().Cors.AllowMethods, ", ")
+	rsp.Headers.Set("Access-Control-Allow-Methods", strMeths)
+
+	rsp.parseHeaders()
+	rsp.Headers.Save(rsp.raw)
+}

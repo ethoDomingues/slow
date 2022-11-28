@@ -44,6 +44,7 @@ type _re struct {
 }
 
 var (
+	// hosts      *regexp.Regexp
 	isStr      = regexp.MustCompile(`{\w+(:str)?[?]?}`)
 	isVar      = regexp.MustCompile(`{\w+(\:(int|str|filepath))?[?]?}`)
 	isVarOpt   = regexp.MustCompile(`{\w+(\:(int|str))?[\?]}`)

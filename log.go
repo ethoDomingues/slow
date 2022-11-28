@@ -44,7 +44,7 @@ type Logger struct {
 	err  *log.Logger
 }
 
-func (l *Logger) Deafault(v ...any) {
+func (l *Logger) Default(v ...any) {
 	l.info.Println(v...)
 }
 
@@ -73,5 +73,5 @@ func (l *Logger) LogRequest(ctxID string) {
 	default:
 		color = _WHITE
 	}
-	l.Deafault(color, rsp.StatusCode, _RESET, "-> ", rq.Raw.Method, rq.Raw.URL.Path)
+	l.Default(color, rsp.StatusCode, _RESET, "-> ", rq.Raw.Method, rq.Raw.URL.Path)
 }

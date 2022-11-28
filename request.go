@@ -2,12 +2,16 @@ package slow
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"encoding/xml"
 	"io"
 	"mime"
 	"mime/multipart"
 	"net/http"
 	"strings"
+
+	"gopkg.in/yaml.v2"
 )
 
 func NewFile(p *multipart.Part) *File {
@@ -84,12 +88,17 @@ func (r *Request) parseCookies() {
 func (r *Request) parseBody() {
 	ctx := r.Ctx()
 	body := bytes.NewBuffer(nil)
+
 	body.Grow(int(r.Raw.ContentLength))
 	io.CopyBuffer(body, r.Raw.Body, nil)
+
 	switch {
-	case r.ContentType == "", r.ContentType == "application/json":
-		r.Body = body.String()
+	case r.ContentType == "", strings.HasPrefix(r.ContentType, "application/json"):
 		json.Unmarshal(body.Bytes(), &r.Form)
+	case strings.HasPrefix(r.ContentType, "application/xml"):
+		xml.Unmarshal(body.Bytes(), &r.Form)
+	case strings.HasPrefix(r.ContentType, "application/yaml"):
+		yaml.Unmarshal(body.Bytes(), &r.Form)
 	case strings.HasPrefix(r.ContentType, "multipart/"):
 		mp := multipart.NewReader(body, r.Mime["boundary"])
 		for {
@@ -113,6 +122,8 @@ func (r *Request) parseBody() {
 			}
 		}
 	}
+	r.Body = body.String()
+
 }
 
 func (r *Request) RequestURL() string {
@@ -120,10 +131,16 @@ func (r *Request) RequestURL() string {
 	return UrlFor(route.fullName, true, r.Args)
 }
 
-func (r *Request) Parse() {
+func (r *Request) parseRequest() {
 	r.parseHeaders()
 	r.parseCookies()
 	r.parseBody()
 }
 
+// Return a *Slow.Ctx of current request
 func (r *Request) Ctx() *Ctx { return contextsNamed[r.ctx] }
+
+// Return a context.Context of current request
+func (r *Request) Context() context.Context { return r.Raw.Context() }
+
+func (r *Request) Cancel() { r.Raw.Context().Done() }
