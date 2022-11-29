@@ -145,6 +145,7 @@ func (r *Response) ImATaerpot() { r.Abort(418) }
 // Send a StatusInternalServerError
 func (r *Response) InternalServerError() { r.Abort(500) }
 
+// Parse Html file and send to client
 func (r *Response) RenderTemplate(pathToFile string, data ...any) {
 	ctx := r.Ctx()
 	dir, file := filepath.Split(ctx.App.TemplateFolder + pathToFile)

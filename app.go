@@ -22,7 +22,7 @@ var (
 	listenInAll   bool
 )
 
-// Return a new app with a default settings
+// Returns a new app with a default settings
 func NewApp() *App {
 	router := &Router{
 		Name:         "",
