@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
-	"strings"
 )
 
 func NewResponse(wr http.ResponseWriter, ctxID string) *Response {
@@ -156,15 +155,3 @@ func (r *Response) RenderTemplate(pathToFile string, data ...any) {
 
 // Stops execution, cleans up the response body, and writes the StatusCode to the response
 func Abort(code int) { panic(fmt.Errorf("abort:%d", code)) }
-
-func optionsHandler(ctx *Ctx) {
-	rsp := ctx.Response
-	mi := ctx.MatchInfo
-
-	rsp.StatusCode = 200
-	strMeths := strings.Join(mi.Route().Cors.AllowMethods, ", ")
-	rsp.Headers.Set("Access-Control-Allow-Methods", strMeths)
-
-	rsp.parseHeaders()
-	rsp.Headers.Save(rsp.raw)
-}

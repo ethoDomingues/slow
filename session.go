@@ -6,7 +6,7 @@ import (
 	"time"
 )
 
-func NewSession(secretKey string) *Session {
+func newSession(secretKey string) *Session {
 	return &Session{
 		jwt: NewJWT(secretKey),
 		del: []string{},
@@ -55,7 +55,7 @@ func (s *Session) Del(key string) {
 }
 
 // Returns a cookie, with the value being a jwt
-func (s *Session) Save() *http.Cookie {
+func (s *Session) save() *http.Cookie {
 	if s.jwt == nil {
 		l.warn.Println("to use the session you need to set a secretKey. rejecting session")
 		return nil
@@ -104,5 +104,5 @@ func (s *Session) Save() *http.Cookie {
 
 // Returns a JWT Token from session data
 func (s *Session) GetSign() string {
-	return s.Save().Value
+	return s.save().Value
 }

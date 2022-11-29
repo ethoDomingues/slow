@@ -11,14 +11,14 @@ import (
 	"time"
 )
 
-func ComputeMac(message, secret []byte) []byte {
+func computeMac(message, secret []byte) []byte {
 	mac := hmac.New(sha256.New, secret)
 	mac.Write(message)
 	return mac.Sum(nil)
 }
 
-func ValidMac(message, messageMac, secret []byte) bool {
-	expectedMac := ComputeMac(message, secret)
+func validMac(message, messageMac, secret []byte) bool {
+	expectedMac := computeMac(message, secret)
 	return hmac.Equal(messageMac, expectedMac)
 }
 
@@ -30,7 +30,7 @@ func SignJWT(headers, payload map[string]string, secret string) string {
 	b64P := base64.RawURLEncoding.EncodeToString(bytsP)
 
 	b64HB := fmt.Sprintf("%s.%s", b64H, b64P)
-	sig := ComputeMac([]byte(b64HB), []byte(secret))
+	sig := computeMac([]byte(b64HB), []byte(secret))
 
 	return fmt.Sprintf("%s.%s", b64HB, base64.RawURLEncoding.EncodeToString(sig))
 }
@@ -42,7 +42,7 @@ func ValidJWT(jwt, secret string) (*JWT, bool) {
 			hb := fmt.Sprintf("%s.%s", hps[0], hps[1])
 			sig, err := base64.RawURLEncoding.DecodeString(hps[2])
 			if err == nil {
-				if ValidMac([]byte(hb), sig, []byte(secret)) {
+				if validMac([]byte(hb), sig, []byte(secret)) {
 					h := map[string]string{}
 					p := map[string]string{}
 

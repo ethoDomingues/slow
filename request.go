@@ -51,10 +51,12 @@ func NewRequest(req *http.Request, ctxID string) *Request {
 }
 
 type Request struct {
-	Raw         *http.Request
-	ctx         string
-	Body        string
-	Method      string
+	Raw *http.Request
+
+	ctx,
+	Body,
+	Method,
+	RemoteAddr,
 	ContentType string
 
 	Form    map[string]any
@@ -145,4 +147,6 @@ func (r *Request) Ctx() *Ctx { return contextsNamed[r.ctx] }
 func (r *Request) Context() context.Context { return r.Raw.Context() }
 
 // Abort the current request. Server does not respond to client
-func (r *Request) Cancel() { r.Raw.Context().Done() }
+func (r *Request) Cancel() {
+	r.Raw.Context().Done()
+}

@@ -7,7 +7,7 @@ import (
 	"strings"
 )
 
-func NewRouter(name string, cfg map[string]string) *Router {
+func NewRouter(name string) *Router {
 	if name == "" {
 		panic(fmt.Errorf("the routers must be named"))
 	}
@@ -25,12 +25,12 @@ type Router struct {
 	Prefix,
 	Subdomain string
 
-	Routes         []*Route
-	subdomainRegex *regexp.Regexp
-	routesByName   map[string]*Route
+	Cors        *Cors
+	Routes      []*Route
+	Middlewares Middlewares
 
-	Middlewares
-	*Cors
+	routesByName   map[string]*Route
+	subdomainRegex *regexp.Regexp
 }
 
 func (r *Router) parse() {
@@ -150,7 +150,7 @@ func (r *Router) Get(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
-		Name:    GetFunctionName(f),
+		Name:    getFunctionName(f),
 		Methods: []string{"GET"},
 	})
 }
@@ -159,7 +159,7 @@ func (r *Router) HEAD(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
-		Name:    GetFunctionName(f),
+		Name:    getFunctionName(f),
 		Methods: []string{"HEAD"},
 	})
 }
@@ -168,7 +168,7 @@ func (r *Router) Post(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
-		Name:    GetFunctionName(f),
+		Name:    getFunctionName(f),
 		Methods: []string{"POST"},
 	})
 }
@@ -177,7 +177,7 @@ func (r *Router) Put(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
-		Name:    GetFunctionName(f),
+		Name:    getFunctionName(f),
 		Methods: []string{"PUT"},
 	})
 }
@@ -186,7 +186,7 @@ func (r *Router) Delete(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
-		Name:    GetFunctionName(f),
+		Name:    getFunctionName(f),
 		Methods: []string{"DELETE"},
 	})
 }
@@ -195,7 +195,7 @@ func (r *Router) CONNECT(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
-		Name:    GetFunctionName(f),
+		Name:    getFunctionName(f),
 		Methods: []string{"CONNECT"},
 	})
 }
@@ -204,7 +204,7 @@ func (r *Router) OPTIONS(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
-		Name:    GetFunctionName(f),
+		Name:    getFunctionName(f),
 		Methods: []string{"OPTIONS"},
 	})
 }
@@ -213,7 +213,7 @@ func (r *Router) TRACE(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
-		Name:    GetFunctionName(f),
+		Name:    getFunctionName(f),
 		Methods: []string{"TRACE"},
 	})
 }
@@ -222,7 +222,7 @@ func (r *Router) PATCH(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
-		Name:    GetFunctionName(f),
+		Name:    getFunctionName(f),
 		Methods: []string{"PATCH"},
 	})
 }

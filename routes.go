@@ -55,11 +55,11 @@ func (r *Route) compileUrl() {
 				if i != len(strs)-1 {
 					l.err.Fatal("optional url var must be last")
 				}
-				str = re.str.ReplaceAllString(str, `([\x00-\x7F]+[^\\\/\s]+)?`)
+				str = re.str.ReplaceAllString(str, `(([\x00-\x7F]+)([^\\\/\s]+)|\d+)?`)
 				str = re.digit.ReplaceAllString(str, `(\d+)?`)
 				str = re.filepath.ReplaceAllString(str, `([\/\w+.-]+)?`)
 			} else {
-				str = re.str.ReplaceAllString(str, `([\x00-\x7F]+[^\\\/\s]+)`)
+				str = re.str.ReplaceAllString(str, `(([\x00-\x7F]+)([^\\\/\s]+)|\d+)`)
 				str = re.digit.ReplaceAllString(str, `(\d+)`)
 				str = re.filepath.ReplaceAllString(str, `([\/\w+.-]+)`)
 			}

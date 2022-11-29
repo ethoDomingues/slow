@@ -13,14 +13,13 @@ func newCtx(app *App) *Ctx {
 		MatchInfo: &MatchInfo{},
 	}
 	if app.SecretKey != "" {
-		c.Session = NewSession(app.SecretKey)
+		c.Session = newSession(app.SecretKey)
 	} else {
 		c.Session = &Session{}
 	}
 
 	c.MatchInfo.ctx = c.id
 
-	c.Session.jwt.Secret = app.SecretKey
 	return c
 }
 

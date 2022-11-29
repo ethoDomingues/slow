@@ -20,7 +20,7 @@ var htmlReplacer = strings.NewReplacer(
 	"'", "&#39;",
 )
 
-func GetFunctionName(i interface{}) string {
+func getFunctionName(i interface{}) string {
 	splitName := strings.Split(
 		runtime.FuncForPC(
 			reflect.ValueOf(i).Pointer(),
@@ -31,15 +31,19 @@ func GetFunctionName(i interface{}) string {
 
 func HtmlEscape(s string) string { return htmlReplacer.Replace(s) }
 
+// Alias of 'fmt.Sprintf("%T", obj)'
 func TypeOf(obj any) string { return fmt.Sprintf("%T", obj) }
 
 /*
 build a URL of a route
 
-	func get(ctx *slow.Ctx) {
-		rs := ctx.Response
-		rs.Redirect(("auth.login"))
-	}
+	app.Get("/users/{userID:int}", index)
+
+	slow.UrlFor("index", false, map[string]string{"userID": 1})
+	// result in: /users/1
+
+	slow.UrlFor("index", true, map[string]string{"userID": 1})
+	// result in: http://yourAddress/users/1
 */
 func UrlFor(name string, external bool, params map[string]string) string {
 	var (
@@ -80,11 +84,11 @@ func UrlFor(name string, external bool, params map[string]string) string {
 		if router.Subdomain != "" {
 			host = "http://" + router.Subdomain + "." + servername
 		} else {
-			host = "http://" + localAddress.String()
+			host = "http://" + localAddress.String() + ":" + strings.Split(app.srv.Addr, ":")[1]
 		}
 	}
 
-	// Build Url
+	// Build path
 	for _, str := range sUrl {
 		if re.isVar.MatchString(str) {
 			fname := re.getVarName(str)
@@ -101,28 +105,34 @@ func UrlFor(name string, external bool, params map[string]string) string {
 			urlBuf.WriteString("/" + str)
 		}
 	}
+
 	// Build Query
+	var query strings.Builder
 	if len(params) > 0 {
 		urlBuf.WriteString("?")
 		for k, v := range params {
-			urlBuf.WriteString(k + "=" + v + "&")
+			query.WriteString(k + "=" + v + "&")
 		}
 	}
-	url := strings.TrimSuffix(urlBuf.String(), "&")
+	url := urlBuf.String()
 	url = re.slash2.ReplaceAllString(url, "/")
 	url = re.dot2.ReplaceAllString(url, ".")
-	return strings.TrimSuffix(host, "/") + url
+	fmt.Println(host)
+	fmt.Println(url)
+	fmt.Println(query.String())
+	if len(params) > 0 {
+		return host + url + strings.TrimSuffix(query.String(), "&")
+	}
+	return host + url
 }
 
 // Get preferred outbound ip of this machine
-func GetOutboundIP() net.IP {
+func getOutboundIP() net.IP {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer conn.Close()
-
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
-
 	return localAddr.IP
 }

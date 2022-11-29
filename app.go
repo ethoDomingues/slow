@@ -17,9 +17,9 @@ var (
 
 	appStack      []*App
 	servername    string
-	localAddress  = GetOutboundIP()
-	contextsNamed map[string]*Ctx
 	listenInAll   bool
+	localAddress  = getOutboundIP()
+	contextsNamed map[string]*Ctx
 )
 
 // Returns a new app with a default settings
@@ -38,7 +38,7 @@ func NewApp() *App {
 		TemplateFolder: "./templates",
 		StaticUrlPath:  "/assets",
 	}
-	router.Get("/assets/{filepath:filepath}", ServeFile)
+	router.Get("/assets/{filepath:filepath}", serveFile)
 	return app
 }
 
@@ -65,7 +65,6 @@ type App struct {
 
 // Parse the router and your routes
 func (app *App) build() {
-	localAddress = GetOutboundIP()
 	servername = app.Servername
 	if app.built {
 		return
@@ -84,7 +83,25 @@ func (app *App) build() {
 	app.built = true
 }
 
-// register the rouuter in app
+/*
+Register the router in app
+
+	func main() {
+		api := slow.NewRouter("api")
+		api.Subdomain = "api"
+		api.Prefix = "/v1"
+		api.post("/products")
+		api.get("/products/{productID:int}")
+
+
+		app := slow.NewApp()
+
+		// This Function
+		app.Mount(getApiRouter)
+
+		app.Listen()
+	}
+*/
 func (app *App) Mount(routers ...*Router) {
 	for _, router := range routers {
 		if router.Name == "" {
@@ -111,7 +128,7 @@ func (app *App) execRoute(ctx *Ctx) {
 
 			if ctx.Session.changed {
 				rsp.SetCookie(
-					ctx.Session.Save(),
+					ctx.Session.save(),
 				)
 			}
 			if rq.Method != "OPTIONS" {
@@ -163,6 +180,7 @@ func (app *App) execRoute(ctx *Ctx) {
 	}
 }
 
+// http.Handler func
 func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	// here begins the request
 	ctx := newCtx(app)
@@ -211,6 +229,7 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	// here, the request is finished
 }
 
+// Build a app and starter Server
 func (app *App) Listen() {
 	var port int
 	var address string
@@ -248,6 +267,7 @@ func (app *App) Listen() {
 	log.Fatal(app.srv.ListenAndServe())
 }
 
+// Show All Routes ( internal )
 func (app *App) listRoutes() {
 	app.build()
 	nameLen := 0

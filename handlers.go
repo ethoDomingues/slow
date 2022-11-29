@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func ServeFile(ctx *Ctx) {
+func serveFile(ctx *Ctx) {
 	rsp := ctx.Response
 	rq := ctx.Request
 
@@ -37,4 +37,16 @@ func ServeFile(ctx *Ctx) {
 	} else {
 		rsp.NotFound()
 	}
+}
+
+func optionsHandler(ctx *Ctx) {
+	rsp := ctx.Response
+	mi := ctx.MatchInfo
+
+	rsp.StatusCode = 200
+	strMeths := strings.Join(mi.Route().Cors.AllowMethods, ", ")
+	rsp.Headers.Set("Access-Control-Allow-Methods", strMeths)
+
+	rsp.parseHeaders()
+	rsp.Headers.Save(rsp.raw)
 }
