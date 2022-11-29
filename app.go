@@ -290,16 +290,5 @@ func (app *App) listRoutes() {
 	fmt.Printf("+-%s-+-%s-+-%s-+\n", line1, line2, line3)
 }
 
+// Show All Routes
 func (app *App) ShowRoutes() { app.listRoutes() }
-
-func optionsHandler(ctx *Ctx) {
-	rsp := ctx.Response
-	mi := ctx.MatchInfo
-
-	rsp.StatusCode = 200
-	strMeths := strings.Join(mi.Route().Cors.AllowMethods, ", ")
-	rsp.Headers.Set("Access-Control-Allow-Methods", strMeths)
-
-	rsp.parseHeaders()
-	rsp.Headers.Save(rsp.raw)
-}
