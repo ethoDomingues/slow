@@ -126,21 +126,23 @@ func (r *Request) parseBody() {
 
 }
 
-func (r *Request) RequestURL() string {
-	route := r.Ctx().Route()
-	return UrlFor(route.fullName, true, r.Args)
-}
-
 func (r *Request) parseRequest() {
 	r.parseHeaders()
 	r.parseCookies()
 	r.parseBody()
 }
 
-// Return a *Slow.Ctx of current request
+// Returns the current url
+func (r *Request) RequestURL() string {
+	route := r.Ctx().Route()
+	return UrlFor(route.fullName, true, r.Args)
+}
+
+// Returns a '*Slow.Ctx' of the current request
 func (r *Request) Ctx() *Ctx { return contextsNamed[r.ctx] }
 
-// Return a context.Context of current request
+// Returns a 'context.Context' of the current request
 func (r *Request) Context() context.Context { return r.Raw.Context() }
 
+// Abort the current request. Server does not respond to client
 func (r *Request) Cancel() { r.Raw.Context().Done() }

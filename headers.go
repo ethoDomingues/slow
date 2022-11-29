@@ -8,38 +8,40 @@ import (
 
 type Headers map[string][]string
 
+// Set a Header
 func (h *Headers) Set(key string, value string) {
-	_h := *h
-	textproto.MIMEHeader(_h).Set(key, value)
+	textproto.MIMEHeader(*(h)).Set(key, value)
 }
 
+// Add value in a in Header Key. If the key does not exist, it is created
 func (h *Headers) Add(key string, value string) {
-	_h := *h
-	textproto.MIMEHeader(_h).Add(key, value)
+	textproto.MIMEHeader(*(h)).Add(key, value)
 }
 
+// Return a value of Header Key. If the key does not exist, return a empty string
 func (h *Headers) Get(key string) string {
-	_h := *h
-	return textproto.MIMEHeader(_h).Get(key)
+	return textproto.MIMEHeader(*(h)).Get(key)
 }
 
 func (h *Headers) Del(key string) {
-	_h := *h
-	textproto.MIMEHeader(_h).Del(key)
+	textproto.MIMEHeader(*(h)).Del(key)
 }
 
+// Set a Cookie. Has the same effect as 'Response.SetCookie'
 func (h *Headers) SetCookie(cookie *http.Cookie) {
 	if v := cookie.String(); v != "" {
 		h.Add("Set-Cookie", v)
 	}
 }
 
+// Write the headers in the response
 func (h *Headers) Save(w http.ResponseWriter) {
 	for key := range *(h) {
 		w.Header().Set(key, h.Get(key))
 	}
 }
 
+// If present on route or router, allows resource sharing between origins
 type Cors struct {
 	MaxAge           string   // Access-Control-Max-Age
 	AllowOrigin      string   // Access-Control-Allow-Origin

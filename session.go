@@ -6,9 +6,9 @@ import (
 	"time"
 )
 
-func NewSession() *Session {
+func NewSession(secretKey string) *Session {
 	return &Session{
-		jwt: NewJWT(),
+		jwt: NewJWT(secretKey),
 		del: []string{},
 	}
 }
@@ -19,8 +19,10 @@ type Session struct {
 	expires          time.Time
 	expiresPermanent time.Time
 	del              []string
+	changed          bool
 }
 
+// validate a cookie session
 func (s *Session) validate(c *http.Cookie, secret string) {
 	str := c.Value
 	if jwt, ok := ValidJWT(str, secret); ok {
@@ -29,27 +31,33 @@ func (s *Session) validate(c *http.Cookie, secret string) {
 			s.Permanent = true
 		}
 	} else {
-		s.jwt = NewJWT()
+		s.jwt = NewJWT(secret)
 	}
 }
 
+// This inserts a value into the session
 func (s *Session) Set(key, value string) {
 	s.jwt.Payload[key] = value
+	s.changed = true
 }
 
+// Returns a session value based on the key. If key does not exist, returns an empty string
 func (s *Session) Get(key string) (string, bool) {
 	v, ok := s.jwt.Payload[key]
 	return v, ok
 }
 
+// Delete a Value from Session
 func (s *Session) Del(key string) {
 	s.del = append(s.del, key)
 	delete(s.jwt.Payload, key)
+	s.changed = true
 }
 
+// Returns a cookie, with the value being a jwt
 func (s *Session) Save() *http.Cookie {
-	if s.jwt.Secret == "" {
-		l.warn.Println("Para usar as session, vc precisda add uma secretKey no app")
+	if s.jwt == nil {
+		l.warn.Println("to use the session you need to set a secretKey. rejecting session")
 		return nil
 	}
 	exp := s.expires
@@ -76,6 +84,14 @@ func (s *Session) Save() *http.Cookie {
 			exp = s.expires
 		}
 	}
+	if len(s.jwt.Payload) == 0 {
+		return &http.Cookie{
+			Name:     "session",
+			Value:    "",
+			MaxAge:   -0,
+			HttpOnly: true,
+		}
+	}
 	s.jwt.Payload["exp"] = fmt.Sprint(exp.Unix())
 
 	return &http.Cookie{
@@ -86,6 +102,7 @@ func (s *Session) Save() *http.Cookie {
 	}
 }
 
+// Returns a JWT Token from session data
 func (s *Session) GetSign() string {
 	return s.Save().Value
 }

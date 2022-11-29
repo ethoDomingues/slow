@@ -7,8 +7,9 @@ import (
 )
 
 var (
-	ErrorMethodMismatch = errors.New("405 Method Not Allowed")
+	ErrHttpAbort        = errors.New("aborted")
 	ErrorNotFound       = errors.New("404 Not Found")
+	ErrorMethodMismatch = errors.New("405 Method Not Allowed")
 )
 
 type MatchInfo struct {

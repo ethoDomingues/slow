@@ -75,13 +75,14 @@ func ValidJWT(jwt, secret string) (*JWT, bool) {
 	return nil, false
 }
 
-func NewJWT() *JWT {
+func NewJWT(secret string) *JWT {
 	return &JWT{
 		Payload: map[string]string{},
 		Headers: map[string]string{
 			"alg": "HS256",
 			"typ": "JWT",
 		},
+		Secret: secret,
 	}
 }
 

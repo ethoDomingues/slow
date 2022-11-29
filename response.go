@@ -64,14 +64,19 @@ func (r *Response) parseHeaders() {
 	}
 }
 
+// Halts execution and closes the "response".
+// This does not clear the response body
 func (r *Response) Close() {
 	panic(ErrHttpAbort)
 }
 
+// Returns a current "*slow.Ctx"
 func (r *Response) Ctx() *Ctx { return contextsNamed[r.ctx] }
 
+// Set a cookie in the Headers of Response
 func (r *Response) SetCookie(cookie *http.Cookie) { r.Headers.SetCookie(cookie) }
 
+// Stops execution, cleans up the response body, and writes the StatusCode to the response
 func (r *Response) Abort(code int) {
 	r.Body.Reset()
 	r.Body.WriteString(fmt.Sprint(code, " ", http.StatusText(code)))
@@ -79,6 +84,7 @@ func (r *Response) Abort(code int) {
 	panic(ErrHttpAbort)
 }
 
+// Redirect to Following URL
 func (r *Response) Redirect(url string) {
 	ctx := r.Ctx()
 	rq := ctx.Request
@@ -115,13 +121,28 @@ func (r *Response) HTML(body string, code int) {
 	panic(ErrHttpAbort)
 }
 
-func (r *Response) Ok()                  { r.Abort(200) }
-func (r *Response) BadRequest()          { r.Abort(400) }
-func (r *Response) Unauthorized()        { r.Abort(401) }
-func (r *Response) Forbidden()           { r.Abort(403) }
-func (r *Response) NotFound()            { r.Abort(404) }
-func (r *Response) MethodNotAllowed()    { r.Abort(405) }
-func (r *Response) ImATaerpot()          { r.Abort(418) }
+// Send a StatusOk, but without the body
+func (r *Response) Ok() { r.Abort(200) }
+
+// Send a BadRequest
+func (r *Response) BadRequest() { r.Abort(400) }
+
+// Send a Unauthorized
+func (r *Response) Unauthorized() { r.Abort(401) }
+
+// Send a StatusForbidden
+func (r *Response) Forbidden() { r.Abort(403) }
+
+// Send a StatusNotFound
+func (r *Response) NotFound() { r.Abort(404) }
+
+// Send a StatusMethodNotAllowed
+func (r *Response) MethodNotAllowed() { r.Abort(405) }
+
+// Send a StatusImATaerpot
+func (r *Response) ImATaerpot() { r.Abort(418) }
+
+// Send a StatusInternalServerError
 func (r *Response) InternalServerError() { r.Abort(500) }
 
 func (r *Response) RenderTemplate(pathToFile string, data ...any) {

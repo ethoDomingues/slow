@@ -27,36 +27,51 @@ const (
 	_RESET          = "\033[m"
 )
 
-func newLogger() *Logger {
-	info := log.New(os.Stdout, _GREEN+"info: "+_RESET, log.Ldate|log.Ltime)
-	warn := log.New(os.Stdout, _YELLOW+"warn: "+_RESET, log.Ldate|log.Ltime)
-	erro := log.New(os.Stdout, _RED+"error: "+_RESET, 0)
-	return &Logger{
-		info: info,
-		warn: warn,
-		err:  erro,
+func newLogger(logFile string) *logger {
+
+	var lFile *log.Logger
+	if logFile != "" {
+		f, err := os.Open(logFile)
+		if err != nil {
+			panic(err)
+		}
+		lFile = log.New(f, _RED+"error: "+_RESET, 0)
+	}
+
+	return &logger{
+		err:     log.New(os.Stdout, _RED+"error: "+_RESET, 0),
+		warn:    log.New(os.Stdout, _YELLOW+"warn: "+_RESET, log.Ldate|log.Ltime),
+		info:    log.New(os.Stdout, _GREEN+"info: "+_RESET, log.Ldate|log.Ltime),
+		logFile: lFile,
 	}
 }
 
-type Logger struct {
-	info *log.Logger
-	warn *log.Logger
-	err  *log.Logger
+type logger struct {
+	info    *log.Logger
+	warn    *log.Logger
+	err     *log.Logger
+	logFile *log.Logger
 }
 
-func (l *Logger) Default(v ...any) {
+func (l *logger) Default(v ...any) {
 	l.info.Println(v...)
+	if l.logFile != nil {
+		l.logFile.Println(v...)
+	}
 }
 
-func (l *Logger) Error(v ...any) {
+func (l *logger) Error(v ...any) {
 	l.err.Println(v...)
+	if l.logFile != nil {
+		l.logFile.Println(v...)
+	}
 	for i := 4; i < 10; i++ {
 		_, file, line, _ := runtime.Caller(i)
 		fmt.Printf("\t%s:%d\n", file, line)
 	}
 }
 
-func (l *Logger) LogRequest(ctxID string) {
+func (l *logger) LogRequest(ctxID string) {
 	rq := contextsNamed[ctxID].Request
 	rsp := contextsNamed[ctxID].Response
 
@@ -73,5 +88,8 @@ func (l *Logger) LogRequest(ctxID string) {
 	default:
 		color = _WHITE
 	}
-	l.Default(color, rsp.StatusCode, _RESET, "-> ", rq.Raw.Method, rq.Raw.URL.Path)
+	l.info.Println(color, rsp.StatusCode, _RESET, "-> ", rq.Raw.Method, rq.Raw.URL.Path)
+	if l.logFile != nil {
+		l.logFile.Println(rsp.StatusCode, "-> ", rq.Raw.Method, rq.Raw.URL.Path)
+	}
 }

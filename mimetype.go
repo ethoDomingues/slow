@@ -3,7 +3,7 @@ package slow
 import "strings"
 
 func GetTypebyFilename(filename string) string {
-	for ext, typ := range TypeByExtension {
+	for ext, typ := range typeByExtension {
 		if strings.HasSuffix(filename, ext) {
 			return typ
 		}
@@ -13,7 +13,7 @@ func GetTypebyFilename(filename string) string {
 
 // javascript
 
-var TypeByExtension = map[string]string{
+var typeByExtension = map[string]string{
 	"1d-interleaved-parityfec":             "video/1d-interleaved-parityfec",
 	"3gpdash-qoe-report+xml":               "application/3gpdash-qoe-report+xml",
 	"3gppHal+json":                         "application/3gppHal+json",

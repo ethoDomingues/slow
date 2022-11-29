@@ -1,19 +1,23 @@
 package slow
 
 import (
-	"context"
 	"time"
 )
 
-func NewCtx(app *App, ctx context.Context) *Ctx {
+// Returns a new *Slow.Ctx
+func newCtx(app *App) *Ctx {
 	c := &Ctx{
 		id:        time.Now().String(),
 		App:       app,
 		Global:    map[string]any{},
-		Session:   NewSession(),
-		Context:   ctx,
 		MatchInfo: &MatchInfo{},
 	}
+	if app.SecretKey != "" {
+		c.Session = NewSession(app.SecretKey)
+	} else {
+		c.Session = &Session{}
+	}
+
 	c.MatchInfo.ctx = c.id
 
 	c.Session.jwt.Secret = app.SecretKey
@@ -21,16 +25,29 @@ func NewCtx(app *App, ctx context.Context) *Ctx {
 }
 
 type Ctx struct {
-	id string
-	context.Context
 
-	App       *App
-	Global    map[string]any
-	Request   *Request
-	Response  *Response
-	Session   *Session
+	// Ctx ID
+	id string
+
+	// Current App
+	App *App
+
+	Global map[string]any
+
+	// Current Request
+	Request *Request
+
+	// Current Response
+	Response *Response
+
+	Session *Session
+
+	// Contains information about the current request and the route
 	MatchInfo *MatchInfo
 }
 
+// Get Current Route
 func (c *Ctx) Router() *Router { return c.MatchInfo.Router() }
-func (c *Ctx) Route() *Route   { return c.MatchInfo.Route() }
+
+// Get Current Router
+func (c *Ctx) Route() *Route { return c.MatchInfo.Route() }

@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	l = newLogger()
+	l *logger
 
 	appStack      []*App
 	servername    string
@@ -50,6 +50,7 @@ type App struct {
 	StaticFolder,
 	TemplateFolder,
 	StaticUrlPath string
+	LogFile string
 
 	routers      []*Router
 	routerByName map[string]*Router
@@ -108,9 +109,10 @@ func (app *App) execRoute(ctx *Ctx) {
 				app.AfterRequest(ctx)
 			}
 
-			if len(ctx.Session.jwt.Payload) > 0 {
-				s := ctx.Session.Save()
-				rsp.SetCookie(s)
+			if ctx.Session.changed {
+				rsp.SetCookie(
+					ctx.Session.Save(),
+				)
 			}
 			if rq.Method != "OPTIONS" {
 				rsp.parseHeaders()
@@ -135,7 +137,7 @@ func (app *App) execRoute(ctx *Ctx) {
 			} else {
 				rsp.StatusCode = 500
 				statusText = "500 Internal Server Error"
-				newLogger().Error(err)
+				l.Error(err)
 			}
 			rsp.raw.WriteHeader(rsp.StatusCode)
 			fmt.Fprint(rsp.raw, statusText)
@@ -163,7 +165,7 @@ func (app *App) execRoute(ctx *Ctx) {
 
 func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	// here begins the request
-	ctx := NewCtx(app, req.Context())
+	ctx := newCtx(app)
 
 	rsp := NewResponse(wr, ctx.id)
 	rq := NewRequest(req, ctx.id)
@@ -222,6 +224,8 @@ func (app *App) Listen() {
 	if address == "0.0.0.0" {
 		listenInAll = true
 	}
+
+	l = newLogger(app.LogFile)
 
 	app.srv = &http.Server{
 		Addr:           address + ":" + fmt.Sprint(port),
