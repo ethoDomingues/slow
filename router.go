@@ -143,7 +143,7 @@ func (r *Router) Add(url, name string, f Func, meths []string) {
 		})
 }
 
-func (r *Router) Get(url string, f Func) {
+func (r *Router) GET(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
@@ -161,7 +161,7 @@ func (r *Router) HEAD(url string, f Func) {
 	})
 }
 
-func (r *Router) Post(url string, f Func) {
+func (r *Router) POST(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
@@ -170,7 +170,7 @@ func (r *Router) Post(url string, f Func) {
 	})
 }
 
-func (r *Router) Put(url string, f Func) {
+func (r *Router) PUT(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
@@ -179,7 +179,7 @@ func (r *Router) Put(url string, f Func) {
 	})
 }
 
-func (r *Router) Delete(url string, f Func) {
+func (r *Router) DELETE(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,

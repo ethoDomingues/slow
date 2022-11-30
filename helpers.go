@@ -37,15 +37,27 @@ func TypeOf(obj any) string { return fmt.Sprintf("%T", obj) }
 /*
 build a URL of a route
 
-	app.Get("/users/{userID:int}", index)
+	app.GET("/users/{userID:int}", index)
 
 	slow.UrlFor("index", false, map[string]string{"userID": 1})
-	// result in: /users/1
+	// results: /users/1
 
 	slow.UrlFor("index", true, map[string]string{"userID": 1})
-	// result in: http://yourAddress/users/1
+	// results: http://yourAddress/users/1
 */
-func UrlFor(name string, external bool, params map[string]string) string {
+func UrlFor(name string, external bool, args ...string) string {
+	if len(args)%2 != 0 {
+		l.err.Fatalf("numer of args of build url, is invalid: UrlFor only accept pairs of args ")
+	}
+	params := map[string]string{}
+	c := len(args)
+	for i := 0; i < c; i++ {
+		if i%2 != 0 {
+			continue
+		}
+		params[args[i]] = args[i+1]
+	}
+
 	var (
 		host   = ""
 		route  *Route
@@ -117,12 +129,11 @@ func UrlFor(name string, external bool, params map[string]string) string {
 	url := urlBuf.String()
 	url = re.slash2.ReplaceAllString(url, "/")
 	url = re.dot2.ReplaceAllString(url, ".")
-	fmt.Println(host)
-	fmt.Println(url)
-	fmt.Println(query.String())
+
 	if len(params) > 0 {
 		return host + url + strings.TrimSuffix(query.String(), "&")
 	}
+
 	return host + url
 }
 

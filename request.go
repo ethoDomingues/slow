@@ -138,7 +138,11 @@ func (r *Request) parseRequest() {
 // Returns the current url
 func (r *Request) RequestURL() string {
 	route := r.Ctx().Route()
-	return UrlFor(route.fullName, true, r.Args)
+	args := []string{}
+	for k, v := range r.Args {
+		args = append(args, k, v)
+	}
+	return UrlFor(route.fullName, true, args...)
 }
 
 // Returns a '*Slow.Ctx' of the current request

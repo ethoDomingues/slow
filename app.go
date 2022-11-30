@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -13,7 +14,7 @@ import (
 )
 
 var (
-	l *logger
+	l = newLogger("")
 
 	appStack      []*App
 	servername    string
@@ -38,7 +39,7 @@ func NewApp() *App {
 		TemplateFolder: "./templates",
 		StaticUrlPath:  "/assets",
 	}
-	router.Get("/assets/{filepath:filepath}", serveFile)
+	router.GET("/assets/{filepath:filepath}", serveFile)
 	return app
 }
 
@@ -272,7 +273,10 @@ func (app *App) listRoutes() {
 	nameLen := 0
 	methLen := 0
 	pathLen := 0
+
+	listRouteName := []string{}
 	for _, r := range app.routesByName {
+		listRouteName = append(listRouteName, r.fullName)
 		if nl := len(r.fullName); nl > nameLen {
 			nameLen = nl + 1
 		}
@@ -283,6 +287,7 @@ func (app *App) listRoutes() {
 			pathLen = pl + 1
 		}
 	}
+	sort.Strings(listRouteName)
 
 	line1 := strings.Repeat("-", nameLen)
 	line2 := strings.Repeat("-", methLen)
@@ -295,9 +300,10 @@ func (app *App) listRoutes() {
 	fmt.Printf("+-%s-+-%s-+-%s-+\n", line1, line2, line3)
 	fmt.Printf("| %s | %s | %s |\n", routeN, methodsN, endpointN)
 	fmt.Printf("+-%s-+-%s-+-%s-+\n", line1, line2, line3)
-	for _, r := range app.routesByName {
+	for _, rName := range listRouteName {
+		r := app.routesByName[rName]
 		mths_ := strings.Join(r.Methods, " ")
-		space1 := nameLen - len(r.fullName)
+		space1 := nameLen - len(rName)
 		space2 := methLen - len(mths_)
 		space3 := pathLen - len(r.fullUrl)
 
