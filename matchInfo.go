@@ -45,7 +45,8 @@ type _re struct {
 }
 
 var (
-	// hosts      *regexp.Regexp
+	// isIPAddress = regexp.MustCompile(`^(([0-9]|[1-9][0-9]|[1][0-9][0-9]|[2][0-5][0-5])([.])){3}([0-9]|[1-9][0-9]|[1][0-9][0-9]|[2][0-5][0-5])(:(\d+))$`)
+
 	isStr      = regexp.MustCompile(`{\w+(:str)?[?]?}`)
 	isVar      = regexp.MustCompile(`{\w+(\:(int|str|filepath))?[?]?}`)
 	isVarOpt   = regexp.MustCompile(`{\w+(\:(int|str))?[\?]}`)

@@ -149,9 +149,9 @@ func (r *Response) RenderTemplate(pathToFile string, data ...any) {
 		t.Execute(r.Body, data)
 		r.Close()
 	} else {
-		l.err.Panicln(err)
+		l.err.Println(err)
 	}
 }
 
 // Stops execution, cleans up the response body, and writes the StatusCode to the response
-func Abort(code int) { panic(fmt.Errorf("abort:%d", code)) }
+func Abort(code int) { panic("abort:" + fmt.Sprint(code)) }

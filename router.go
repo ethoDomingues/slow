@@ -95,13 +95,10 @@ func (r *Router) Match(ctx *Ctx) bool {
 		if !r.subdomainRegex.MatchString(u) {
 			return false
 		}
+		// else, if the app has a servername...
 	} else if sname := ctx.App.Servername; sname != "" {
 		if sname != rqUrl {
 			return false
-		}
-	} else if !listenInAll {
-		if !strings.HasSuffix(rq.Raw.RemoteAddr, "127") {
-			rq.Raw.Context().Done()
 		}
 	}
 

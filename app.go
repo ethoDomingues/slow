@@ -182,7 +182,7 @@ func (app *App) execRoute(ctx *Ctx) {
 
 // http.Handler func
 func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
-	// here begins the request
+
 	ctx := newCtx(app)
 
 	rsp := NewResponse(wr, ctx.id)
@@ -234,7 +234,7 @@ func (app *App) Listen() {
 	var port int
 	var address string
 
-	flag.StringVar(&address, "address", "localhost", "address of server listen. default: localhost")
+	flag.StringVar(&address, "address", "127.0.0.1", "address of server listen. default: localhost")
 	flag.IntVar(&port, "port", 5000, "port of server listen. default: 5000")
 
 	flag.Parse()
@@ -263,7 +263,6 @@ func (app *App) Listen() {
 	} else {
 		l.Default("Server is linsten in", app.srv.Addr)
 	}
-	fmt.Println()
 	log.Fatal(app.srv.ListenAndServe())
 }
 

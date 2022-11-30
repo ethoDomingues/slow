@@ -38,9 +38,10 @@ type File struct {
 
 func NewRequest(req *http.Request, ctxID string) *Request {
 	return &Request{
-		ctx:    ctxID,
-		Raw:    req,
-		Method: req.Method,
+		ctx:        ctxID,
+		Raw:        req,
+		Method:     req.Method,
+		RemoteAddr: req.RemoteAddr,
 
 		Args:    map[string]string{},
 		Mime:    map[string]string{},
