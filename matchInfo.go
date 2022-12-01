@@ -18,19 +18,17 @@ type MatchInfo struct {
 	Match            bool
 	MethodNotAllowed error
 
-	ctx    string
+	ctx    *Ctx
 	route  string
 	router string
 }
 
-func (m *MatchInfo) Ctx() *Ctx { return contextsNamed[m.ctx] }
-
 func (m *MatchInfo) Router() *Router {
-	return m.Ctx().App.routerByName[m.router]
+	return m.ctx.App.routerByName[m.router]
 }
 
 func (m *MatchInfo) Route() *Route {
-	return m.Ctx().App.routesByName[m.route]
+	return m.ctx.App.routesByName[m.route]
 }
 
 type _re struct {

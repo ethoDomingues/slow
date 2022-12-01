@@ -71,9 +71,9 @@ func (l *logger) Error(v ...any) {
 	}
 }
 
-func (l *logger) LogRequest(ctxID string) {
-	rq := contextsNamed[ctxID].Request
-	rsp := contextsNamed[ctxID].Response
+func (l *logger) LogRequest(ctx *Ctx) {
+	rq := ctx.Request
+	rsp := ctx.Response
 
 	color := ""
 	switch {

@@ -1,32 +1,23 @@
 package slow
 
-import (
-	"time"
-)
-
 // Returns a new *Slow.Ctx
 func newCtx(app *App) *Ctx {
 	c := &Ctx{
-		id:        time.Now().String(),
 		App:       app,
 		Global:    map[string]any{},
 		MatchInfo: &MatchInfo{},
 	}
+	c.MatchInfo.ctx = c
 	if app.SecretKey != "" {
 		c.Session = newSession(app.SecretKey)
 	} else {
 		c.Session = &Session{}
 	}
 
-	c.MatchInfo.ctx = c.id
-
 	return c
 }
 
 type Ctx struct {
-
-	// Ctx ID
-	id string
 
 	// Current App
 	App *App

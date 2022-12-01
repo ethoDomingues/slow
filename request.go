@@ -36,9 +36,9 @@ type File struct {
 	Stream       *bytes.Buffer
 }
 
-func NewRequest(req *http.Request, ctxID string) *Request {
+func NewRequest(req *http.Request, ctx *Ctx) *Request {
 	return &Request{
-		ctx:        ctxID,
+		ctx:        ctx,
 		Raw:        req,
 		Method:     req.Method,
 		RemoteAddr: req.RemoteAddr,
@@ -54,7 +54,7 @@ func NewRequest(req *http.Request, ctxID string) *Request {
 type Request struct {
 	Raw *http.Request
 
-	ctx,
+	ctx *Ctx
 	Body,
 	Method,
 	RemoteAddr,
@@ -69,7 +69,7 @@ type Request struct {
 }
 
 func (r *Request) parseHeaders() {
-	ctx := r.Ctx()
+	ctx := r.ctx
 	ct := r.Raw.Header.Get("Content-Type")
 	mediaType, params, err := mime.ParseMediaType(ct)
 	if err != nil {
@@ -89,7 +89,7 @@ func (r *Request) parseCookies() {
 }
 
 func (r *Request) parseBody() {
-	ctx := r.Ctx()
+	ctx := r.ctx
 	body := bytes.NewBuffer(nil)
 
 	body.Grow(int(r.Raw.ContentLength))
@@ -137,16 +137,13 @@ func (r *Request) parseRequest() {
 
 // Returns the current url
 func (r *Request) RequestURL() string {
-	route := r.Ctx().Route()
+	route := r.ctx.Route()
 	args := []string{}
 	for k, v := range r.Args {
 		args = append(args, k, v)
 	}
 	return UrlFor(route.fullName, true, args...)
 }
-
-// Returns a '*Slow.Ctx' of the current request
-func (r *Request) Ctx() *Ctx { return contextsNamed[r.ctx] }
 
 // Returns a 'context.Context' of the current request
 func (r *Request) Context() context.Context { return r.Raw.Context() }

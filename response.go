@@ -10,10 +10,10 @@ import (
 	"path/filepath"
 )
 
-func NewResponse(wr http.ResponseWriter, ctxID string) *Response {
+func NewResponse(wr http.ResponseWriter, ctx *Ctx) *Response {
 	return &Response{
 		raw:        wr,
-		ctx:        ctxID,
+		ctx:        ctx,
 		Body:       bytes.NewBufferString(""),
 		Headers:    &Headers{},
 		StatusCode: 200,
@@ -21,16 +21,17 @@ func NewResponse(wr http.ResponseWriter, ctxID string) *Response {
 }
 
 type Response struct {
-	ctx        string
 	StatusCode int
 
-	raw     http.ResponseWriter
 	Body    *bytes.Buffer
 	Headers *Headers
+
+	ctx *Ctx
+	raw http.ResponseWriter
 }
 
 func (r *Response) parseHeaders() {
-	ctx := r.Ctx()
+	ctx := r.ctx
 	method := ctx.Request.Method
 	routerCors := ctx.MatchInfo.Router().Cors
 	if routerCors != nil {
@@ -62,15 +63,12 @@ func (r *Response) parseHeaders() {
 	}
 }
 
-// Returns a current "*slow.Ctx"
-func (r *Response) Ctx() *Ctx { return contextsNamed[r.ctx] }
-
 // Set a cookie in the Headers of Response
 func (r *Response) SetCookie(cookie *http.Cookie) { r.Headers.SetCookie(cookie) }
 
 // Redirect to Following URL
 func (r *Response) Redirect(url string) {
-	ctx := r.Ctx()
+	ctx := r.ctx
 	rq := ctx.Request
 
 	r.Body.Reset()
@@ -135,7 +133,7 @@ func (r *Response) InternalServerError() { Abort(500) }
 
 // Parse Html file and send to client
 func (r *Response) RenderTemplate(pathToFile string, data ...any) {
-	ctx := r.Ctx()
+	ctx := r.ctx
 	dir, file := filepath.Split(ctx.App.TemplateFolder + pathToFile)
 	d := http.Dir(dir)
 	if f, err := d.Open(file); err == nil {

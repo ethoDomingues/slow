@@ -16,11 +16,10 @@ import (
 var (
 	l = newLogger("")
 
-	appStack      []*App
-	servername    string
-	listenInAll   bool
-	localAddress  = getOutboundIP()
-	contextsNamed map[string]*Ctx
+	appStack     []*App
+	servername   string
+	listenInAll  bool
+	localAddress = getOutboundIP()
 )
 
 // Returns a new app with a default settings
@@ -183,17 +182,13 @@ func (app *App) execRoute(ctx *Ctx) {
 
 // http.Handler func
 func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
-
 	ctx := newCtx(app)
 
-	rsp := NewResponse(wr, ctx.id)
-	rq := NewRequest(req, ctx.id)
+	rsp := NewResponse(wr, ctx)
+	rq := NewRequest(req, ctx)
 
 	ctx.Request = rq
 	ctx.Response = rsp
-
-	contextsNamed[ctx.id] = ctx
-	defer delete(contextsNamed, ctx.id)
 
 	rq.parseRequest()
 
@@ -226,8 +221,9 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	if app.TearDownRequest != nil {
 		app.TearDownRequest(ctx)
 	}
-	l.LogRequest(ctx.id)
+	l.LogRequest(ctx)
 	// here, the request is finished
+
 }
 
 // Build a app and starter Server
@@ -254,9 +250,7 @@ func (app *App) Listen() {
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
-	if contextsNamed == nil {
-		contextsNamed = map[string]*Ctx{}
-	}
+
 	if listenInAll {
 		l.Default("Server is listening in all address")
 		l.info.Printf("          listening in: %s:%d", localAddress, port)
