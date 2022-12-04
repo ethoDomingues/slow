@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"net/http"
 	"sort"
 	"strconv"
@@ -442,7 +443,11 @@ func (app *App) Build(addr ...string) {
 // Build a app and starter Server
 func (app *App) Listen(host ...string) error {
 	app.Build(host...)
-	port := strings.Split(app.srv.Addr, ":")[1]
+	_, port, err := net.SplitHostPort(app.srv.Addr)
+	if err != nil {
+		l.err.Fatal(err)
+	}
+
 	if !app.Silent {
 		if listenInAll {
 			l.Default("Server is listening in all address")
