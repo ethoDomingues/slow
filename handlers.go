@@ -4,6 +4,7 @@ import (
 	"io"
 	"mime"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -16,9 +17,14 @@ func serveFile(ctx *Ctx) {
 	static := ctx.App.StaticUrlPath
 
 	pathToFile := strings.TrimPrefix(uri, static)
+	p, _ := os.Executable()
+	if p == "" || strings.HasPrefix(p, "/tmp") {
+		p, _ = os.Getwd()
+	}
+	pathToFile = filepath.Join(ctx.App.TemplateFolder + pathToFile)
+	dir, file := filepath.Split(pathToFile)
+	d := http.Dir(filepath.Join(p, dir))
 
-	dir, file := filepath.Split(ctx.App.StaticFolder + pathToFile)
-	d := http.Dir(dir)
 	if f, err := d.Open(file); err == nil {
 		defer f.Close()
 		if fStat, err := f.Stat(); err != nil || fStat.IsDir() {

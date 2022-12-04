@@ -7,7 +7,9 @@ import (
 	"html/template"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
+	"strings"
 )
 
 func NewResponse(wr http.ResponseWriter, ctx *Ctx) *Response {
@@ -158,8 +160,19 @@ func (r *Response) InternalServerError(body ...any) {
 // Parse Html file and send to client
 func (r *Response) RenderTemplate(pathToFile string, data ...any) {
 	ctx := r.ctx
+	p, err := os.Executable()
+	if err != nil {
+		panic(fmt.Sprint(err))
+	}
+	if strings.HasPrefix(p, "/tmp") {
+		p, err = os.Getwd()
+		if err != nil {
+			panic(fmt.Sprint(err))
+		}
+	}
+
 	dir, file := filepath.Split(ctx.App.TemplateFolder + pathToFile)
-	d := http.Dir(dir)
+	d := http.Dir(filepath.Join(p, dir))
 	if f, err := d.Open(file); err == nil {
 		defer f.Close()
 		buf := bytes.NewBuffer(nil)
@@ -172,6 +185,7 @@ func (r *Response) RenderTemplate(pathToFile string, data ...any) {
 		r.Close()
 	} else {
 		l.err.Println(err)
+		r.NotFound("Template Not Found")
 	}
 }
 
