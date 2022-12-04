@@ -142,8 +142,40 @@ func (r *Request) RequestURL() string {
 	for k, v := range r.Args {
 		args = append(args, k, v)
 	}
-	return UrlFor(route.fullName, true, args...)
+	return r.ctx.App.UrlFor(route.fullName, true, args...)
 }
+
+/*
+URL Builder
+
+	app.GET("/", index)
+	app.GET("/login", login)
+
+	app.UrlFor("login", false, "next", "currentUrl"})
+	// results: /login?next=currentUrl
+
+	app.UrlFor("login", true, "token", "foobar"})
+	// results: http://yourAddress/login?token=foobar
+
+	// example
+	func index(ctx *slow.Ctx) {
+		req := ctx.Request
+		rsp := ctx.Response
+		userID, ok := ctx.Global["user"]
+		if !ok {
+			next := r.RequestUrl()
+			rsp.Redirect(req.UrlFor("login", true, "next", next))
+			//  redirect to: http://youraddress/login?next=http://yourhost:port/
+		}
+		... you code here
+	}
+*/
+func (r *Request) UrlFor(name string, external bool, args ...string) string {
+	return r.ctx.App.UrlFor(name, external, args...)
+}
+
+/* Returns a '*slow.Ctx' of the current request */
+func (r *Request) Ctx() *Ctx { return r.ctx }
 
 // Returns a 'context.Context' of the current request
 func (r *Request) Context() context.Context { return r.Raw.Context() }

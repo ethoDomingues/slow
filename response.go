@@ -93,6 +93,14 @@ func (r *Response) JSON(body any, code int) {
 	r.Body.Write(j)
 	panic(ErrHttpAbort)
 }
+func (r *Response) TEXT(body string, code int) {
+	r.Body.Reset()
+
+	r.StatusCode = code
+	r.Headers.Set("Content-Type", "text/plain")
+	r.Body.WriteString(body)
+	panic(ErrHttpAbort)
+}
 
 func (r *Response) HTML(body string, code int) {
 	r.Body.Reset()
@@ -108,28 +116,44 @@ func (r *Response) HTML(body string, code int) {
 func (r *Response) Close() { panic(ErrHttpAbort) }
 
 // Send a StatusOk, but without the body
-func (r *Response) Ok() { Abort(200) }
+func (r *Response) Ok(body ...any) {
+	r.TEXT(fmt.Sprint(body...), 200)
+}
 
 // Send a BadRequest
-func (r *Response) BadRequest() { Abort(400) }
+func (r *Response) BadRequest(body ...any) {
+	r.TEXT(fmt.Sprint(body...), 400)
+}
 
 // Send a Unauthorized
-func (r *Response) Unauthorized() { Abort(401) }
+func (r *Response) Unauthorized(body ...any) {
+	r.TEXT(fmt.Sprint(body...), 401)
+}
 
 // Send a StatusForbidden
-func (r *Response) Forbidden() { Abort(403) }
+func (r *Response) Forbidden(body ...any) {
+	r.TEXT(fmt.Sprint(body...), 403)
+}
 
 // Send a StatusNotFound
-func (r *Response) NotFound() { Abort(404) }
+func (r *Response) NotFound(body ...any) {
+	r.TEXT(fmt.Sprint(body...), 404)
+}
 
 // Send a StatusMethodNotAllowed
-func (r *Response) MethodNotAllowed() { Abort(405) }
+func (r *Response) MethodNotAllowed(body ...any) {
+	r.TEXT(fmt.Sprint(body...), 405)
+}
 
 // Send a StatusImATaerpot
-func (r *Response) ImATaerpot() { Abort(418) }
+func (r *Response) ImATaerpot(body ...any) {
+	r.TEXT(fmt.Sprint(body...), 418)
+}
 
 // Send a StatusInternalServerError
-func (r *Response) InternalServerError() { Abort(500) }
+func (r *Response) InternalServerError(body ...any) {
+	r.TEXT(fmt.Sprint(body...), 500)
+}
 
 // Parse Html file and send to client
 func (r *Response) RenderTemplate(pathToFile string, data ...any) {

@@ -1,9 +1,9 @@
 package slow
 
 import (
+	"errors"
 	"flag"
 	"fmt"
-	"log"
 	"net/http"
 	"sort"
 	"strconv"
@@ -16,10 +16,15 @@ import (
 var (
 	l = newLogger("")
 
-	appStack     []*App
 	servername   string
 	listenInAll  bool
 	localAddress = getOutboundIP()
+	allowEnv     = map[string]string{
+		"dev":         "development",
+		"development": "development",
+		"prod":        "production",
+		"production":  "production",
+	}
 )
 
 // Returns a new app with a default settings
@@ -45,75 +50,28 @@ func NewApp() *App {
 type App struct {
 	*Router
 
-	SecretKey,
-	Servername,
-	StaticFolder,
-	TemplateFolder,
-	StaticUrlPath string
-	LogFile string
+	SecretKey, // for sign session
+	Servername, // for build url routes and route match
+	StaticFolder, // for serve static files
+	TemplateFolder, // for render template (html) files
+	StaticUrlPath, // url uf request static file
+	LogFile, // save log info in file
+	Env string // environmnt
+
+	Silent bool //don't print logs
 
 	routers      []*Router
 	routerByName map[string]*Router
 
-	BeforeRequest   Func
-	AfterRequest    Func
-	TearDownRequest Func
+	BeforeRequest, // exec before each request
+	AfterRequest, // exec after each request (if the application dont crash)
+	TearDownRequest Func // exec after each request, after send to cleint ( this dont has effect in response)
 
 	built bool
 	srv   *http.Server
 }
 
-// Parse the router and your routes
-func (app *App) build() {
-	servername = app.Servername
-	if app.built {
-		return
-	}
-
-	appStack = append(appStack, app)
-
-	// go app.parseHosts()
-
-	for _, router := range app.routers {
-		router.parse()
-		if router.Name != "" {
-			maps.Copy(app.routesByName, router.routesByName)
-		}
-	}
-	app.built = true
-}
-
-/*
-Register the router in app
-
-	func main() {
-		api := slow.NewRouter("api")
-		api.Subdomain = "api"
-		api.Prefix = "/v1"
-		api.post("/products")
-		api.get("/products/{productID:int}")
-
-
-		app := slow.NewApp()
-
-		// This Function
-		app.Mount(getApiRouter)
-
-		app.Listen()
-	}
-*/
-func (app *App) Mount(routers ...*Router) {
-	for _, router := range routers {
-		if router.Name == "" {
-			panic(fmt.Errorf("the routers must be named"))
-		} else if _, ok := app.routerByName[router.Name]; ok {
-			panic(fmt.Errorf("router '%s' already regitered", router.Name))
-		}
-		app.routerByName[router.Name] = router
-		app.routers = append(app.routers, router)
-	}
-}
-
+// exec route and handle errors of application
 func (app *App) execRoute(ctx *Ctx) {
 	rsp := ctx.Response
 	rq := ctx.Request
@@ -223,42 +181,140 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	}
 	l.LogRequest(ctx)
 	// here, the request is finished
-
 }
 
-// Build a app and starter Server
-func (app *App) Listen() {
-	var port int
-	var address string
+/*
+Register the router in app
 
-	flag.StringVar(&address, "address", "127.0.0.1", "address of server listen. default: localhost")
-	flag.IntVar(&port, "port", 5000, "port of server listen. default: 5000")
+	func main() {
+		api := slow.NewRouter("api")
+		api.Subdomain = "api"
+		api.Prefix = "/v1"
+		api.post("/products")
+		api.get("/products/{productID:int}")
 
-	flag.Parse()
 
-	app.build()
-	if address == "0.0.0.0" {
-		listenInAll = true
+		app := slow.NewApp()
+
+		// This Function
+		app.Mount(getApiRouter)
+
+		app.Listen()
+	}
+*/
+func (app *App) Mount(routers ...*Router) {
+	for _, router := range routers {
+		if router.Name == "" {
+			panic(fmt.Errorf("the routers must be named"))
+		} else if _, ok := app.routerByName[router.Name]; ok {
+			panic(fmt.Errorf("router '%s' already regitered", router.Name))
+		}
+		app.routerByName[router.Name] = router
+		app.routers = append(app.routers, router)
+	}
+}
+
+/*
+Url Builder
+
+	app.GET("/users/{userID:int}", index)
+
+	app.UrlFor("index", false, "userID", "1"})
+	// results: /users/1
+
+	app.UrlFor("index", true, "userID", "1"})
+	// results: http://yourAddress/users/1
+*/
+func (app *App) UrlFor(name string, external bool, args ...string) string {
+	var (
+		host   = ""
+		route  *Route
+		router *Router
+	)
+
+	if app.srv == nil {
+		l.err.Fatalf("vc esta tentando usar essa função fora de um contexto")
 	}
 
-	l = newLogger(app.LogFile)
-
-	app.srv = &http.Server{
-		Addr:           address + ":" + fmt.Sprint(port),
-		Handler:        app,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
-		MaxHeaderBytes: 1 << 20,
+	if len(args)%2 != 0 {
+		l.err.Fatalf("numer of args of build url, is invalid: UrlFor only accept pairs of args ")
+	}
+	params := map[string]string{}
+	c := len(args)
+	for i := 0; i < c; i++ {
+		if i%2 != 0 {
+			continue
+		}
+		params[args[i]] = args[i+1]
 	}
 
-	if listenInAll {
-		l.Default("Server is listening in all address")
-		l.info.Printf("          listening in: %s:%d", localAddress, port)
-		l.info.Printf("          listening in: 127.0.0.1:%d", port)
+	if r, ok := app.routesByName[name]; ok {
+		route = r
+	}
+	if strings.Contains(name, ".") {
+		routerName := strings.Split(name, ".")[0]
+		router = app.routerByName[routerName]
 	} else {
-		l.Default("Server is linsten in", app.srv.Addr)
+		router = app.Router
 	}
-	log.Fatal(app.srv.ListenAndServe())
+
+	if route == nil {
+		panic(errors.New("route '" + name + "' is not found"))
+	}
+
+	// Pre Build
+	var sUrl = strings.Split(route.fullUrl, "/")
+	var urlBuf strings.Builder
+
+	// Build Host
+	if external {
+		if router.Subdomain != "" {
+			host = "http://" + router.Subdomain + "." + servername
+		} else {
+			isTls := len(app.srv.TLSConfig.Certificates) > 0
+			if isTls {
+				host = "https://" + localAddress.String() + ":" + strings.Split(app.srv.Addr, ":")[1]
+			} else {
+				host = "http://" + localAddress.String() + ":" + strings.Split(app.srv.Addr, ":")[1]
+			}
+		}
+	}
+
+	// Build path
+	for _, str := range sUrl {
+		if re.isVar.MatchString(str) {
+			fname := re.getVarName(str)
+			value, ok := params[fname]
+			if !ok {
+				if !re.isVarOpt.MatchString(str) {
+					panic(errors.New("Route '" + name + "' needs parameter '" + str + "' but not passed"))
+				}
+			} else {
+				urlBuf.WriteString("/" + value)
+				delete(params, fname)
+			}
+		} else {
+			urlBuf.WriteString("/" + str)
+		}
+	}
+
+	// Build Query
+	var query strings.Builder
+	if len(params) > 0 {
+		urlBuf.WriteString("?")
+		for k, v := range params {
+			query.WriteString(k + "=" + v + "&")
+		}
+	}
+	url := urlBuf.String()
+	url = re.slash2.ReplaceAllString(url, "/")
+	url = re.dot2.ReplaceAllString(url, ".")
+
+	if len(params) > 0 {
+		return host + url + strings.TrimSuffix(query.String(), "&")
+	}
+
+	return host + url
 }
 
 // Show All Routes ( internal )
@@ -311,3 +367,105 @@ func (app *App) listRoutes() {
 
 // Show All Routes
 func (app *App) ShowRoutes() { app.listRoutes() }
+
+// Parse the router and your routes
+func (app *App) build() {
+	servername = app.Servername
+	if app.built {
+		return
+	}
+
+	for _, router := range app.routers {
+		router.parse()
+		if router.Name != "" {
+			maps.Copy(app.routesByName, router.routesByName)
+		}
+	}
+}
+
+/*
+Build app & server, but not start serve
+
+example:
+
+	func index(ctx slow.Ctx){}
+
+	// it's work
+	func main() {
+		app := slow.NewApp()
+		app.GET("/",index)
+		app.Build(":5000")
+		app.UrlFor("index",true)
+	}
+	// it's don't work
+	func main() {
+		app := slow.NewApp()
+		app.GET("/",index)
+		app.UrlFor("index",true)
+	}
+*/
+func (app *App) Build(addr ...string) {
+	var address string
+	if app.Env == "" {
+		app.Env = "development"
+	} else if _, ok := allowEnv[app.Env]; !ok {
+		l.err.Fatalf("environment '%s' is not valid", app.Env)
+	}
+	l = newLogger(app.LogFile)
+
+	if len(addr) > 0 {
+		address = addr[0]
+	} else if !flag.Parsed() {
+		flag.StringVar(&address, "address", "127.0.0.1:5000", "address of server listen. default: localhost")
+		flag.Parse()
+	} else {
+		l.warn.Println("you are using more than one application and you are trying to use the same address for both.")
+		p := getFreePort()
+		address = "127.0.0.1:" + p
+	}
+	app.build()
+
+	if strings.Contains(address, "0.0.0.0") {
+		listenInAll = true
+	}
+
+	app.srv = &http.Server{
+		Addr:           address,
+		Handler:        app,
+		ReadTimeout:    10 * time.Second,
+		WriteTimeout:   10 * time.Second,
+		MaxHeaderBytes: 1 << 20,
+	}
+	app.built = true
+}
+
+// Build a app and starter Server
+func (app *App) Listen(host ...string) error {
+	app.Build(host...)
+	port := strings.Split(app.srv.Addr, ":")[1]
+	if !app.Silent {
+		if listenInAll {
+			l.Default("Server is listening in all address")
+			l.info.Printf("          listening in: http://%s:%s", localAddress, port)
+			l.info.Printf("          listening in: http://127.0.0.1:%s", port)
+		} else {
+			l.Default("Server is linsten in", app.srv.Addr)
+		}
+	}
+	return app.srv.ListenAndServe()
+}
+
+// Build a app and starter Server
+func (app *App) ListenTLS(certFile string, keyFile string, host ...string) error {
+	app.Build(host...)
+	port := strings.Split(app.srv.Addr, ":")[1]
+	if listenInAll {
+		l.Default("Server is listening in all address")
+		l.info.Printf("          listening in: https://%s:%s", localAddress, port)
+		l.info.Printf("          listening in: https://127.0.0.1:%s", port)
+	} else {
+		l.Default("Server is linsten in", app.srv.Addr)
+	}
+	l.Default("environment: ", app.Env)
+	return app.srv.ListenAndServeTLS(certFile, keyFile)
+}

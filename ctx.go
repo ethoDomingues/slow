@@ -8,11 +8,7 @@ func newCtx(app *App) *Ctx {
 		MatchInfo: &MatchInfo{},
 	}
 	c.MatchInfo.ctx = c
-	if app.SecretKey != "" {
-		c.Session = newSession(app.SecretKey)
-	} else {
-		c.Session = &Session{}
-	}
+	c.Session = newSession(app.SecretKey)
 
 	return c
 }

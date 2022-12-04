@@ -184,3 +184,96 @@ func (r *Route) Match(ctx *Ctx) bool {
 	mi.route = ""
 	return false
 }
+
+func ALL(url string, f Func) *Route {
+	return &Route{
+		Url:  url,
+		Func: f,
+		Name: getFunctionName(f),
+		Methods: []string{
+			"GET", "HEAD", "POST",
+			"PUT", "DELETE", "CONNECT",
+			"OPTIONS", "TRACE", "PATCH"},
+	}
+}
+
+func GET(url string, f Func) *Route {
+	return &Route{
+		Url:     url,
+		Func:    f,
+		Name:    getFunctionName(f),
+		Methods: []string{"GET"},
+	}
+}
+
+func HEAD(url string, f Func) *Route {
+	return &Route{
+		Url:     url,
+		Func:    f,
+		Name:    getFunctionName(f),
+		Methods: []string{"HEAD"},
+	}
+}
+
+func POST(url string, f Func) *Route {
+	return &Route{
+		Url:     url,
+		Func:    f,
+		Name:    getFunctionName(f),
+		Methods: []string{"POST"},
+	}
+}
+
+func PUT(url string, f Func) *Route {
+	return &Route{
+		Url:     url,
+		Func:    f,
+		Name:    getFunctionName(f),
+		Methods: []string{"PUT"},
+	}
+}
+
+func DELETE(url string, f Func) *Route {
+	return &Route{
+		Url:     url,
+		Func:    f,
+		Name:    getFunctionName(f),
+		Methods: []string{"DELETE"},
+	}
+}
+
+func CONNECT(url string, f Func) *Route {
+	return &Route{
+		Url:     url,
+		Func:    f,
+		Name:    getFunctionName(f),
+		Methods: []string{"CONNECT"},
+	}
+}
+
+func OPTIONS(url string, f Func) *Route {
+	return &Route{
+		Url:     url,
+		Func:    f,
+		Name:    getFunctionName(f),
+		Methods: []string{"OPTIONS"},
+	}
+}
+
+func TRACE(url string, f Func) *Route {
+	return &Route{
+		Url:     url,
+		Func:    f,
+		Name:    getFunctionName(f),
+		Methods: []string{"TRACE"},
+	}
+}
+
+func PATCH(url string, f Func) *Route {
+	return &Route{
+		Url:     url,
+		Func:    f,
+		Name:    getFunctionName(f),
+		Methods: []string{"PATCH"},
+	}
+}

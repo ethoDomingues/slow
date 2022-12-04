@@ -96,10 +96,6 @@ func (r *Router) Match(ctx *Ctx) bool {
 			return false
 		}
 		// else, if the app has a servername...
-	} else if sname := ctx.App.Servername; sname != "" {
-		if sname != rqUrl {
-			return false
-		}
 	}
 
 	for _, route := range r.Routes {
@@ -141,6 +137,18 @@ func (r *Router) Add(url, name string, f Func, meths []string) {
 			Func:    f,
 			Methods: meths,
 		})
+}
+
+func (r *Router) ALL(url string, f Func) {
+	r.addRoute(&Route{
+		Url:  url,
+		Func: f,
+		Name: getFunctionName(f),
+		Methods: []string{
+			"GET", "HEAD", "POST",
+			"PUT", "DELETE", "CONNECT",
+			"OPTIONS", "TRACE", "PATCH"},
+	})
 }
 
 func (r *Router) GET(url string, f Func) {
