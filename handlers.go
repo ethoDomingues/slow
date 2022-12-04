@@ -17,10 +17,8 @@ func serveFile(ctx *Ctx) {
 	static := ctx.App.StaticUrlPath
 
 	pathToFile := strings.TrimPrefix(uri, static)
-	p, _ := os.Executable()
-	if p == "" || strings.HasPrefix(p, "/tmp") {
-		p, _ = os.Getwd()
-	}
+	p, _ := os.Getwd()
+
 	pathToFile = filepath.Join(ctx.App.StaticFolder + pathToFile)
 	dir, file := filepath.Split(pathToFile)
 	d := http.Dir(filepath.Join(p, dir))
