@@ -1,7 +1,6 @@
 package slow
 
 import (
-	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -18,13 +17,11 @@ func serveFile(ctx *Ctx) {
 	static := ctx.App.StaticUrlPath
 
 	pathToFile := strings.TrimPrefix(uri, static)
-	p, _ := os.Getwd()
 
-	pathToFile = filepath.Join(ctx.App.StaticFolder + pathToFile)
-	dir, file := filepath.Split(pathToFile)
-	d := http.Dir(filepath.Join(p, dir))
-	fmt.Println(filepath.Join(p, dir))
-	if f, err := d.Open(file); err == nil {
+	p := GetFullPath()
+	pathToFile = filepath.Join(p, ctx.App.StaticFolder, pathToFile)
+	if f, err := os.Open(pathToFile); err == nil {
+		_, file := filepath.Split(pathToFile)
 		defer f.Close()
 		if fStat, err := f.Stat(); err != nil || fStat.IsDir() {
 			rsp.NotFound()

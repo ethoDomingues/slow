@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
@@ -29,11 +31,6 @@ func getFunctionName(i interface{}) string {
 	return splitName[len(splitName)-1]
 }
 
-func HtmlEscape(s string) string { return htmlReplacer.Replace(s) }
-
-// Alias of 'fmt.Sprintf("%T", obj)'
-func TypeOf(obj any) string { return fmt.Sprintf("%T", obj) }
-
 // Get preferred outbound ip of this machine
 func getOutboundIP() net.IP {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
@@ -58,4 +55,22 @@ func getFreePort() (port string) {
 	}
 	fmt.Println(port)
 	return port
+}
+
+func HtmlEscape(s string) string { return htmlReplacer.Replace(s) }
+
+// Alias of 'fmt.Sprintf("%T", obj)'
+func TypeOf(obj any) string { return fmt.Sprintf("%T", obj) }
+
+func GetFullPath() string {
+	p, _ := os.Executable()
+	if p == "" || strings.HasPrefix(p, "/tmp") {
+		p, _ = os.Getwd()
+		return p
+	} else {
+		ps := strings.Split(p, "/")
+		ps[len(ps)-1] = ""
+		p = filepath.Join(ps...)
+	}
+	return filepath.Join("/", p)
 }

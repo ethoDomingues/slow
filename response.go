@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 func NewResponse(wr http.ResponseWriter, ctx *Ctx) *Response {
@@ -160,31 +159,20 @@ func (r *Response) InternalServerError(body ...any) {
 // Parse Html file and send to client
 func (r *Response) RenderTemplate(pathToFile string, data ...any) {
 	ctx := r.ctx
-	p, err := os.Executable()
-	if err != nil {
-		panic(fmt.Sprint(err))
-	}
-	if strings.HasPrefix(p, "/tmp") {
-		p, err = os.Getwd()
-		if err != nil {
-			panic(fmt.Sprint(err))
-		}
-	}
+	fullPath := filepath.Join(GetFullPath(), ctx.App.TemplateFolder, pathToFile)
 
-	dir, file := filepath.Split(ctx.App.TemplateFolder + pathToFile)
-	d := http.Dir(filepath.Join(p, dir))
-	if f, err := d.Open(file); err == nil {
+	if f, err := os.Open(fullPath); err == nil {
 		defer f.Close()
 		buf := bytes.NewBuffer(nil)
 		io.Copy(buf, f)
-		t, err := template.New(file).Parse(buf.String())
+		t, err := template.New("").Parse(buf.String())
 		if err != nil {
 			l.err.Panic(err)
 		}
 		t.Execute(r.Body, data)
 		r.Close()
 	} else {
-		l.err.Println(err)
+		l.err.Println(filepath.Join(ctx.App.TemplateFolder, pathToFile), " does not exist")
 		r.NotFound("Template Not Found")
 	}
 }
