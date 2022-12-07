@@ -76,26 +76,30 @@ func (r *Router) parse() {
 func (r *Router) Match(ctx *Ctx) bool {
 	rq := ctx.Request
 	rqUrl := rq.Raw.Host
-
-	// if o router has a subdomain...
+	if servername != "" {
+		if !strings.Contains(rqUrl, servername) {
+			return false
+		}
+	}
 	if r.subdomainRegex != nil {
-
-		// and the o request address is a ip...
 		if net.ParseIP(rqUrl) != nil {
 			return false
 		}
-
-		// and the o request address dont contais dot...
+		// só para garantir q a proxima etapa não quebre
 		if !strings.Contains(rqUrl, ".") {
 			return false
 		}
-
 		u := strings.Split(rqUrl, ".")[0]
-		// and the o request address[0] dont match...
+		// se o subdominio não der match
 		if !r.subdomainRegex.MatchString(u) {
 			return false
 		}
-		// else, if the app has a servername...
+	} else {
+		if servername != "" && r.Subdomain == "" {
+			if rqUrl != servername {
+				return false
+			}
+		}
 	}
 
 	for _, route := range r.Routes {
@@ -147,7 +151,8 @@ func (r *Router) ALL(url string, f Func) {
 		Methods: []string{
 			"GET", "HEAD", "POST",
 			"PUT", "DELETE", "CONNECT",
-			"OPTIONS", "TRACE", "PATCH"},
+			"OPTIONS", "TRACE", "PATCH",
+		},
 	})
 }
 
