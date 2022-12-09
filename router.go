@@ -69,7 +69,6 @@ func (r *Router) parse() {
 
 		route.parse()
 		r.routesByName[route.fullName] = route
-
 	}
 }
 
@@ -104,7 +103,7 @@ func (r *Router) Match(ctx *Ctx) bool {
 
 	for _, route := range r.Routes {
 		if route.Match(ctx) {
-			ctx.MatchInfo.router = r.Name
+			ctx.MatchInfo.Router = r
 			return true
 		}
 	}

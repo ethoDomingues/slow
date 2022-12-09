@@ -46,7 +46,7 @@ func optionsHandler(ctx *Ctx) {
 	mi := ctx.MatchInfo
 
 	rsp.StatusCode = 200
-	strMeths := strings.Join(mi.Route().Cors.AllowMethods, ", ")
+	strMeths := strings.Join(mi.Route.Cors.AllowMethods, ", ")
 	rsp.Headers.Set("Access-Control-Allow-Methods", strMeths)
 
 	rsp.parseHeaders()

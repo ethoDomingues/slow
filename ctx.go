@@ -33,7 +33,7 @@ type Ctx struct {
 }
 
 // Get Current Route
-func (c *Ctx) Router() *Router { return c.MatchInfo.Router() }
+func (c *Ctx) Router() *Router { return c.MatchInfo.Router }
 
 // Get Current Router
-func (c *Ctx) Route() *Route { return c.MatchInfo.Route() }
+func (c *Ctx) Route() *Route { return c.MatchInfo.Route }

@@ -19,16 +19,8 @@ type MatchInfo struct {
 	MethodNotAllowed error
 
 	ctx    *Ctx
-	route  string
-	router string
-}
-
-func (m *MatchInfo) Router() *Router {
-	return m.ctx.App.routerByName[m.router]
-}
-
-func (m *MatchInfo) Route() *Route {
-	return m.ctx.App.routesByName[m.route]
+	Route  *Route
+	Router *Router
 }
 
 type _re struct {

@@ -43,8 +43,8 @@ func NewApp() *App {
 		StaticFolder:   "./assets",
 		TemplateFolder: "./templates",
 		StaticUrlPath:  "/assets",
+		EnableStatic:   true,
 	}
-	router.GET("/assets/{filepath:filepath}", serveFile)
 	return app
 }
 
@@ -59,7 +59,8 @@ type App struct {
 	LogFile, // save log info in file
 	Env string // environmnt
 
-	Silent bool //don't print logs
+	Silent       bool //don't print logs
+	EnableStatic bool // enable static endpoint for serving static files
 
 	routers      []*Router
 	routerByName map[string]*Router
@@ -126,11 +127,11 @@ func (app *App) execRoute(ctx *Ctx) {
 			app.BeforeRequest(ctx)
 		}
 
-		for _, mid := range ctx.MatchInfo.Router().Middlewares {
+		for _, mid := range ctx.MatchInfo.Router.Middlewares {
 			mid(ctx)
 		}
 
-		for _, mid := range ctx.MatchInfo.Route().Middlewares {
+		for _, mid := range ctx.MatchInfo.Route.Middlewares {
 			mid(ctx)
 		}
 
@@ -165,7 +166,7 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	}
 	if mi.Match {
 		rq.Query = req.URL.Query()
-		rq.Args = re.getUrlValues(mi.Route().fullUrl, req.URL.Path)
+		rq.Args = re.getUrlValues(mi.Route.fullUrl, req.URL.Path)
 		app.execRoute(ctx)
 	} else if mi.MethodNotAllowed != nil {
 		rsp.StatusCode = 405
@@ -255,12 +256,15 @@ func (app *App) UrlFor(name string, external bool, args ...string) string {
 	if strings.Contains(name, ".") {
 		routerName := strings.Split(name, ".")[0]
 		router = app.routerByName[routerName]
+		if router == nil {
+			l.err.Panicln(routerName, " is undefined")
+		}
 	} else {
 		router = app.Router
 	}
 
 	if route == nil {
-		panic(errors.New("route '" + name + "' is not found"))
+		l.err.Panicln("route '" + name + "' is not found")
 	}
 
 	// Pre Build
@@ -269,14 +273,19 @@ func (app *App) UrlFor(name string, external bool, args ...string) string {
 
 	// Build Host
 	if external {
+		schema := "http://"
+		if len(app.srv.TLSConfig.Certificates) > 0 {
+			schema = "https://"
+		}
 		if router.Subdomain != "" {
-			host = "http://" + router.Subdomain + "." + servername
+			host = schema + router.Subdomain + "." + servername
 		} else {
-			isTls := len(app.srv.TLSConfig.Certificates) > 0
-			if isTls {
-				host = "https://" + localAddress.String() + ":" + strings.Split(app.srv.Addr, ":")[1]
+			if servername == "" {
+				_, p, _ := net.SplitHostPort(app.srv.Addr)
+				h := net.JoinHostPort(localAddress.String(), p)
+				host = schema + h
 			} else {
-				host = "http://" + localAddress.String() + ":" + strings.Split(app.srv.Addr, ":")[1]
+				host = schema + servername
 			}
 		}
 	}
@@ -375,12 +384,17 @@ func (app *App) build() {
 	if app.built {
 		return
 	}
-
+	if app.EnableStatic {
+		app.GET("/assets/{filepath:filepath}", serveFile)
+	}
 	for _, router := range app.routers {
 		router.parse()
-		if router.Name != "" {
+		if router != app.Router {
 			maps.Copy(app.routesByName, router.routesByName)
 		}
+	}
+	if app.Router.Name != "" {
+		app.routerByName[app.Router.Name] = app.Router
 	}
 }
 

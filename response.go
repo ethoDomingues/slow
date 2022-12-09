@@ -34,11 +34,11 @@ type Response struct {
 func (r *Response) parseHeaders() {
 	ctx := r.ctx
 	method := ctx.Request.Method
-	routerCors := ctx.MatchInfo.Router().Cors
+	routerCors := ctx.MatchInfo.Router.Cors
 	if routerCors != nil {
 		routerCors.parse(r.Headers)
 	}
-	routeCors := ctx.MatchInfo.Route().Cors
+	routeCors := ctx.MatchInfo.Route.Cors
 	if routeCors != nil {
 		routeCors.parse(r.Headers)
 	}

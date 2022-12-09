@@ -176,12 +176,12 @@ func (r *Route) Match(ctx *Ctx) bool {
 			mi.Func = meth.Func
 		}
 		mi.Match = true
-		mi.route = r.fullName
+		mi.Route = r
 
 		return true
 	}
 	mi.MethodNotAllowed = ErrorMethodMismatch
-	mi.route = ""
+	mi.Route = nil
 	return false
 }
 
