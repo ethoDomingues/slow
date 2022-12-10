@@ -73,6 +73,26 @@ type App struct {
 	srv   *http.Server
 }
 
+// Parse the router and your routes
+func (app *App) build() {
+	servername = app.Servername
+	if app.built {
+		return
+	}
+	if app.EnableStatic {
+		app.GET("/assets/{filepath:filepath}", serveFile)
+	}
+	for _, router := range app.routers {
+		router.parse()
+		if router != app.Router {
+			maps.Copy(app.routesByName, router.routesByName)
+		}
+	}
+	if app.Router.Name != "" {
+		app.routerByName[app.Router.Name] = app.Router
+	}
+}
+
 // exec route and handle errors of application
 func (app *App) execRoute(ctx *Ctx) {
 	rsp := ctx.Response
@@ -100,17 +120,16 @@ func (app *App) execRoute(ctx *Ctx) {
 		} else {
 			rsp.StatusCode = 200
 			statusText := ""
-			if TypeOf(err) == "string" {
-				str := err.(string)
-				if strings.HasPrefix(str, "abort:") {
-					strCode := strings.TrimPrefix(str, "abort:")
-					code, err := strconv.Atoi(strCode)
-					if err != nil {
-						panic(err)
-					}
-					rsp.StatusCode = code
-					statusText = strCode + " " + http.StatusText(code)
+			errStr, ok := err.(string)
+			if ok && strings.HasPrefix(errStr, "abort:") {
+				strCode := strings.TrimPrefix(errStr, "abort:")
+				code, err := strconv.Atoi(strCode)
+				if err != nil {
+					panic(err)
 				}
+				rsp.StatusCode = code
+				statusText = strCode + " " + http.StatusText(code)
+
 			} else {
 				rsp.StatusCode = 500
 				statusText = "500 Internal Server Error"
@@ -140,10 +159,74 @@ func (app *App) execRoute(ctx *Ctx) {
 	}
 }
 
+// Show All Routes ( internal )
+func (app *App) listRoutes() {
+	app.build()
+	nameLen := 0
+	methLen := 0
+	pathLen := 0
+
+	listRouteName := []string{}
+	for _, r := range app.routesByName {
+		listRouteName = append(listRouteName, r.fullName)
+		if nl := len(r.fullName); nl > nameLen {
+			nameLen = nl + 1
+		}
+		if ml := len(strings.Join(r.Methods, " ")); ml > methLen {
+			methLen = ml + 1
+		}
+		if pl := len(r.fullUrl); pl > pathLen {
+			pathLen = pl + 1
+		}
+	}
+	sort.Strings(listRouteName)
+
+	line1 := strings.Repeat("-", nameLen)
+	line2 := strings.Repeat("-", methLen)
+	line3 := strings.Repeat("-", pathLen)
+
+	routeN := "ROUTES" + strings.Repeat(" ", nameLen-6)
+	methodsN := "METHODS" + strings.Repeat(" ", methLen-7)
+	endpointN := "ENDPOINTS" + strings.Repeat(" ", pathLen-9)
+
+	fmt.Printf("+-%s-+-%s-+-%s-+\n", line1, line2, line3)
+	fmt.Printf("| %s | %s | %s |\n", routeN, methodsN, endpointN)
+	fmt.Printf("+-%s-+-%s-+-%s-+\n", line1, line2, line3)
+	for _, rName := range listRouteName {
+		r := app.routesByName[rName]
+		mths_ := strings.Join(r.Methods, " ")
+		space1 := nameLen - len(rName)
+		space2 := methLen - len(mths_)
+		space3 := pathLen - len(r.fullUrl)
+
+		endpoint := r.fullName + strings.Repeat(" ", space1)
+		mths := mths_ + strings.Repeat(" ", space2)
+		path := r.fullUrl + strings.Repeat(" ", space3)
+		fmt.Printf("| %s | %s | %s |\n", endpoint, mths, path)
+	}
+	fmt.Printf("+-%s-+-%s-+-%s-+\n", line1, line2, line3)
+}
+
+func (app *App) Match(ctx *Ctx) bool {
+	rq := ctx.Request
+	rqUrl := rq.Raw.Host
+	hasServername := servername != ""
+	validRequestHost := strings.Contains(rqUrl, servername)
+	if hasServername && !validRequestHost {
+		ctx.Request.Raw.Context().Done()
+	}
+
+	for _, router := range app.routers {
+		if router.Match(ctx) {
+			return true
+		}
+	}
+	return false
+}
+
 // http.Handler func
 func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	ctx := newCtx(app)
-
 	rsp := NewResponse(wr, ctx)
 	rq := NewRequest(req, ctx)
 
@@ -159,12 +242,7 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	}
 
 	mi := ctx.MatchInfo
-	for _, router := range app.routers {
-		if router.Match(ctx) {
-			break
-		}
-	}
-	if mi.Match {
+	if app.Match(ctx) {
 		rq.Query = req.URL.Query()
 		rq.Args = re.getUrlValues(mi.Route.fullUrl, req.URL.Path)
 		app.execRoute(ctx)
@@ -257,7 +335,7 @@ func (app *App) UrlFor(name string, external bool, args ...string) string {
 		routerName := strings.Split(name, ".")[0]
 		router = app.routerByName[routerName]
 		if router == nil {
-			l.err.Panicln(routerName, " is undefined")
+			panic(routerName + " is undefined")
 		}
 	} else {
 		router = app.Router
@@ -327,76 +405,8 @@ func (app *App) UrlFor(name string, external bool, args ...string) string {
 	return host + url
 }
 
-// Show All Routes ( internal )
-func (app *App) listRoutes() {
-	app.build()
-	nameLen := 0
-	methLen := 0
-	pathLen := 0
-
-	listRouteName := []string{}
-	for _, r := range app.routesByName {
-		listRouteName = append(listRouteName, r.fullName)
-		if nl := len(r.fullName); nl > nameLen {
-			nameLen = nl + 1
-		}
-		if ml := len(strings.Join(r.Methods, " ")); ml > methLen {
-			methLen = ml + 1
-		}
-		if pl := len(r.fullUrl); pl > pathLen {
-			pathLen = pl + 1
-		}
-	}
-	sort.Strings(listRouteName)
-
-	line1 := strings.Repeat("-", nameLen)
-	line2 := strings.Repeat("-", methLen)
-	line3 := strings.Repeat("-", pathLen)
-
-	routeN := "ROUTES" + strings.Repeat(" ", nameLen-6)
-	methodsN := "METHODS" + strings.Repeat(" ", methLen-7)
-	endpointN := "ENDPOINTS" + strings.Repeat(" ", pathLen-9)
-
-	fmt.Printf("+-%s-+-%s-+-%s-+\n", line1, line2, line3)
-	fmt.Printf("| %s | %s | %s |\n", routeN, methodsN, endpointN)
-	fmt.Printf("+-%s-+-%s-+-%s-+\n", line1, line2, line3)
-	for _, rName := range listRouteName {
-		r := app.routesByName[rName]
-		mths_ := strings.Join(r.Methods, " ")
-		space1 := nameLen - len(rName)
-		space2 := methLen - len(mths_)
-		space3 := pathLen - len(r.fullUrl)
-
-		endpoint := r.fullName + strings.Repeat(" ", space1)
-		mths := mths_ + strings.Repeat(" ", space2)
-		path := r.fullUrl + strings.Repeat(" ", space3)
-		fmt.Printf("| %s | %s | %s |\n", endpoint, mths, path)
-	}
-	fmt.Printf("+-%s-+-%s-+-%s-+\n", line1, line2, line3)
-}
-
 // Show All Routes
 func (app *App) ShowRoutes() { app.listRoutes() }
-
-// Parse the router and your routes
-func (app *App) build() {
-	servername = app.Servername
-	if app.built {
-		return
-	}
-	if app.EnableStatic {
-		app.GET("/assets/{filepath:filepath}", serveFile)
-	}
-	for _, router := range app.routers {
-		router.parse()
-		if router != app.Router {
-			maps.Copy(app.routesByName, router.routesByName)
-		}
-	}
-	if app.Router.Name != "" {
-		app.routerByName[app.Router.Name] = app.Router
-	}
-}
 
 /*
 Build app & server, but not start serve

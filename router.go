@@ -77,6 +77,7 @@ func (r *Router) Match(ctx *Ctx) bool {
 	rqUrl := rq.Raw.Host
 	if servername != "" {
 		if !strings.Contains(rqUrl, servername) {
+			ctx.Request.Cancel()
 			return false
 		}
 	}
@@ -93,12 +94,8 @@ func (r *Router) Match(ctx *Ctx) bool {
 		if !r.subdomainRegex.MatchString(u) {
 			return false
 		}
-	} else {
-		if servername != "" && r.Subdomain == "" {
-			if rqUrl != servername {
-				return false
-			}
-		}
+	} else if rqUrl != servername {
+		ctx.Request.Cancel()
 	}
 
 	for _, route := range r.Routes {

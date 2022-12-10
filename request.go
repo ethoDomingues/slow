@@ -137,7 +137,7 @@ func (r *Request) parseRequest() {
 
 // Returns the current url
 func (r *Request) RequestURL() string {
-	route := r.ctx.Route()
+	route := r.ctx.MatchInfo.Route
 	args := []string{}
 	for k, v := range r.Args {
 		args = append(args, k, v)
@@ -179,8 +179,3 @@ func (r *Request) Ctx() *Ctx { return r.ctx }
 
 // Returns a 'context.Context' of the current request
 func (r *Request) Context() context.Context { return r.Raw.Context() }
-
-// Abort the current request. Server does not respond to client
-func (r *Request) Cancel() {
-	r.Raw.Context().Done()
-}

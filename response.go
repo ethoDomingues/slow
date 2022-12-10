@@ -69,15 +69,11 @@ func (r *Response) SetCookie(cookie *http.Cookie) { r.Headers.SetCookie(cookie) 
 
 // Redirect to Following URL
 func (r *Response) Redirect(url string) {
-	ctx := r.ctx
-	rq := ctx.Request
-
 	r.Body.Reset()
 	r.Headers.Set("Location", url)
-	if rq.Raw.Method == "GET" || rq.Raw.Method == "HEAD" {
-		r.Headers.Set("Content-Type", "text/html; charset=utf-8")
-	}
 	r.StatusCode = 302
+
+	r.Headers.Set("Content-Type", "text/html; charset=utf-8")
 	r.Body.WriteString("<a href=\"" + HtmlEscape(url) + "\"> Manual Redirect </a>.\n")
 	panic(ErrHttpAbort)
 }
@@ -94,6 +90,7 @@ func (r *Response) JSON(body any, code int) {
 	r.Body.Write(j)
 	panic(ErrHttpAbort)
 }
+
 func (r *Response) TEXT(body string, code int) {
 	r.Body.Reset()
 
@@ -116,45 +113,29 @@ func (r *Response) HTML(body string, code int) {
 // This does not clear the response body
 func (r *Response) Close() { panic(ErrHttpAbort) }
 
-// Send a StatusOk, but without the body
-func (r *Response) Ok(body ...any) {
-	r.TEXT(fmt.Sprint(body...), 200)
-}
+// Send a StatusOk ( Status and Text )
+func (r *Response) Ok(body ...any) { r.TEXT(fmt.Sprint(body...), 200) }
 
-// Send a BadRequest
-func (r *Response) BadRequest(body ...any) {
-	r.TEXT(fmt.Sprint(body...), 400)
-}
+// Send a BadRequest ( Status and Text )
+func (r *Response) BadRequest(body ...any) { r.TEXT(fmt.Sprint(body...), 400) }
 
-// Send a Unauthorized
-func (r *Response) Unauthorized(body ...any) {
-	r.TEXT(fmt.Sprint(body...), 401)
-}
+// Send a Unauthorized ( Status and Text )
+func (r *Response) Unauthorized(body ...any) { r.TEXT(fmt.Sprint(body...), 401) }
 
-// Send a StatusForbidden
-func (r *Response) Forbidden(body ...any) {
-	r.TEXT(fmt.Sprint(body...), 403)
-}
+// Send a StatusForbidden ( Status and Text )
+func (r *Response) Forbidden(body ...any) { r.TEXT(fmt.Sprint(body...), 403) }
 
-// Send a StatusNotFound
-func (r *Response) NotFound(body ...any) {
-	r.TEXT(fmt.Sprint(body...), 404)
-}
+// Send a StatusNotFound ( Status and Text )
+func (r *Response) NotFound(body ...any) { r.TEXT(fmt.Sprint(body...), 404) }
 
-// Send a StatusMethodNotAllowed
-func (r *Response) MethodNotAllowed(body ...any) {
-	r.TEXT(fmt.Sprint(body...), 405)
-}
+// Send a StatusMethodNotAllowed ( Status and Text )
+func (r *Response) MethodNotAllowed(body ...any) { r.TEXT(fmt.Sprint(body...), 405) }
 
-// Send a StatusImATaerpot
-func (r *Response) ImATaerpot(body ...any) {
-	r.TEXT(fmt.Sprint(body...), 418)
-}
+// Send a StatusImATaerpot ( Status and Text )
+func (r *Response) ImATaerpot(body ...any) { r.TEXT(fmt.Sprint(body...), 418) }
 
-// Send a StatusInternalServerError
-func (r *Response) InternalServerError(body ...any) {
-	r.TEXT(fmt.Sprint(body...), 500)
-}
+// Send a StatusInternalServerError ( Status and Text )
+func (r *Response) InternalServerError(body ...any) { r.TEXT(fmt.Sprint(body...), 500) }
 
 // Parse Html file and send to client
 func (r *Response) RenderTemplate(pathToFile string, data ...any) {
@@ -175,6 +156,11 @@ func (r *Response) RenderTemplate(pathToFile string, data ...any) {
 		l.err.Println(filepath.Join(ctx.App.TemplateFolder, pathToFile), " does not exist")
 		r.NotFound("Template Not Found")
 	}
+}
+
+// Abort the current request. Server does not respond to client
+func (r *Request) Cancel() {
+	r.Raw.Context().Done()
 }
 
 // Stops execution, cleans up the response body, and writes the StatusCode to the response

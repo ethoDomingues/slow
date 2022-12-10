@@ -30,10 +30,10 @@ type Ctx struct {
 
 	// Contains information about the current request and the route
 	MatchInfo *MatchInfo
+
+	cancel bool
 }
 
-// Get Current Route
-func (c *Ctx) Router() *Router { return c.MatchInfo.Router }
-
-// Get Current Router
-func (c *Ctx) Route() *Route { return c.MatchInfo.Route }
+func (ctx *Ctx) UrlFor(name string, external bool, args ...string) string {
+	return ctx.App.UrlFor(name, external, args...)
+}
