@@ -8,7 +8,7 @@ import (
 
 func newSession(secretKey string) *Session {
 	return &Session{
-		jwt: NewJWT(secretKey),
+		jwt: newJWT(secretKey),
 		del: []string{},
 	}
 }
@@ -31,7 +31,11 @@ func (s *Session) validate(c *http.Cookie, secret string) {
 			s.Permanent = true
 		}
 	} else {
-		s.jwt = NewJWT(secret)
+		if secret != "" {
+			s.jwt = newJWT("")
+		} else {
+			s.jwt = NewJWT(secret)
+		}
 	}
 }
 

@@ -75,7 +75,14 @@ type App struct {
 
 // Parse the router and your routes
 func (app *App) build() {
-	servername = app.Servername
+	if app.Servername != "" {
+		aaa := app.Servername
+		aaa = strings.TrimPrefix(aaa, ".")
+		aaa = strings.TrimSuffix(aaa, "/")
+
+		servername = aaa
+		app.Servername = aaa
+	}
 	if app.built {
 		return
 	}
@@ -93,19 +100,14 @@ func (app *App) build() {
 	}
 }
 
-// exec route and handle errors of application
-func (app *App) execRoute(ctx *Ctx) {
+func (app *App) closeConn(ctx *Ctx) {
 	rsp := ctx.Response
 	rq := ctx.Request
-
-	defer func() {
-		err := recover()
-		if err == ErrHttpAbort || err == nil {
-			// if raise a error in any mid or in route func, app.AfterRequest not is executed.
-			if app.AfterRequest != nil {
-				app.AfterRequest(ctx)
-			}
-
+	err := recover()
+	defer l.LogRequest(ctx)
+	if err == ErrHttpAbort || err == nil {
+		mi := ctx.MatchInfo
+		if mi.Match {
 			if ctx.Session.changed {
 				rsp.SetCookie(
 					ctx.Session.save(),
@@ -113,49 +115,65 @@ func (app *App) execRoute(ctx *Ctx) {
 			}
 			if rq.Method != "OPTIONS" {
 				rsp.parseHeaders()
-				rsp.Headers.Save(rsp.raw)
+				rsp.Header.Save(rsp.raw)
 			}
-			rsp.raw.WriteHeader(rsp.StatusCode)
-			fmt.Fprint(rsp.raw, rsp.Body.String())
 		} else {
-			rsp.StatusCode = 200
-			statusText := ""
-			errStr, ok := err.(string)
-			if ok && strings.HasPrefix(errStr, "abort:") {
-				strCode := strings.TrimPrefix(errStr, "abort:")
-				code, err := strconv.Atoi(strCode)
-				if err != nil {
-					panic(err)
-				}
-				rsp.StatusCode = code
-				statusText = strCode + " " + http.StatusText(code)
-
+			if mi.MethodNotAllowed != nil {
+				rsp.StatusCode = 405
+				rsp.Body.WriteString("405 Method Not Allowed")
 			} else {
-				rsp.StatusCode = 500
-				statusText = "500 Internal Server Error"
-				l.Error(err)
+				rsp.StatusCode = 404
+				rsp.Body.WriteString("404 Not Found")
 			}
-			rsp.raw.WriteHeader(rsp.StatusCode)
-			fmt.Fprint(rsp.raw, statusText)
 		}
-	}()
+		rsp.raw.WriteHeader(rsp.StatusCode)
+		fmt.Fprint(rsp.raw, rsp.Body.String())
+	} else {
+		rsp.StatusCode = 200
+		statusText := ""
+		errStr, ok := err.(string)
+		if ok && strings.HasPrefix(errStr, "abort:") {
+			strCode := strings.TrimPrefix(errStr, "abort:")
+			code, err := strconv.Atoi(strCode)
+			if err != nil {
+				panic(err)
+			}
+			rsp.StatusCode = code
+			statusText = strCode + " " + http.StatusText(code)
+
+		} else {
+			rsp.StatusCode = 500
+			statusText = "500 Internal Server Error"
+			l.Error(err)
+		}
+		rsp.raw.WriteHeader(rsp.StatusCode)
+		fmt.Fprint(rsp.raw, statusText)
+	}
+
+	if app.TearDownRequest != nil {
+		app.TearDownRequest(ctx)
+	}
+}
+
+// exec route and handle errors of application
+func (app *App) execRoute(ctx *Ctx) {
+	rq := ctx.Request
 	if ctx.MatchInfo.Func == nil && rq.Method == "OPTIONS" {
 		optionsHandler(ctx)
 	} else {
 		if app.BeforeRequest != nil {
 			app.BeforeRequest(ctx)
 		}
-
 		for _, mid := range ctx.MatchInfo.Router.Middlewares {
 			mid(ctx)
 		}
-
 		for _, mid := range ctx.MatchInfo.Route.Middlewares {
 			mid(ctx)
 		}
-
-		// if raise a error in any mid, Route.Func not is executed.
 		ctx.MatchInfo.Func(ctx)
+		if app.AfterRequest != nil {
+			app.AfterRequest(ctx)
+		}
 	}
 }
 
@@ -209,11 +227,15 @@ func (app *App) listRoutes() {
 
 func (app *App) Match(ctx *Ctx) bool {
 	rq := ctx.Request
-	rqUrl := rq.Raw.Host
-	hasServername := servername != ""
-	validRequestHost := strings.Contains(rqUrl, servername)
-	if hasServername && !validRequestHost {
-		ctx.Request.Raw.Context().Done()
+
+	if servername != "" {
+		rqUrl := rq.URL.Host
+		if !strings.Contains(rqUrl, servername) {
+			return false
+		}
+		if net.ParseIP(rqUrl) != nil {
+			return false
+		}
 	}
 
 	for _, router := range app.routers {
@@ -233,34 +255,21 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	ctx.Request = rq
 	ctx.Response = rsp
 
+	defer app.closeConn(ctx)
 	rq.parseRequest()
-
 	if app.SecretKey != "" {
 		if c, ok := rq.Cookies["session"]; ok {
 			ctx.Session.validate(c, app.SecretKey)
 		}
 	}
-
 	mi := ctx.MatchInfo
 	if app.Match(ctx) {
 		rq.Query = req.URL.Query()
 		rq.Args = re.getUrlValues(mi.Route.fullUrl, req.URL.Path)
 		app.execRoute(ctx)
-	} else if mi.MethodNotAllowed != nil {
-		rsp.StatusCode = 405
-		rsp.raw.WriteHeader(405)
-		fmt.Fprint(rsp.raw, "405 Method Not Allowed")
-	} else {
-		rsp.StatusCode = 404
-		rsp.raw.WriteHeader(404)
-		fmt.Fprint(rsp.raw, "404 Not Found")
-	}
-
-	if app.TearDownRequest != nil {
+	} else if app.TearDownRequest != nil {
 		app.TearDownRequest(ctx)
 	}
-	l.LogRequest(ctx)
-	// here, the request is finished
 }
 
 /*
@@ -311,11 +320,9 @@ func (app *App) UrlFor(name string, external bool, args ...string) string {
 		route  *Route
 		router *Router
 	)
-
 	if app.srv == nil {
 		l.err.Fatalf("vc esta tentando usar essa função fora de um contexto")
 	}
-
 	if len(args)%2 != 0 {
 		l.err.Fatalf("numer of args of build url, is invalid: UrlFor only accept pairs of args ")
 	}
@@ -327,7 +334,6 @@ func (app *App) UrlFor(name string, external bool, args ...string) string {
 		}
 		params[args[i]] = args[i+1]
 	}
-
 	if r, ok := app.routesByName[name]; ok {
 		route = r
 	}
@@ -335,20 +341,19 @@ func (app *App) UrlFor(name string, external bool, args ...string) string {
 		routerName := strings.Split(name, ".")[0]
 		router = app.routerByName[routerName]
 		if router == nil {
-			panic(routerName + " is undefined")
+			panic(fmt.Sprintf("Router '%s' is undefined \n", routerName))
 		}
 	} else {
 		router = app.Router
 	}
-
 	if route == nil {
-		l.err.Panicln("route '" + name + "' is not found")
-	}
+		panic(fmt.Sprintf("Route '%s' is undefined \n", name))
 
+		// l.err.Panicln("route '" + name + "' is not found")
+	}
 	// Pre Build
 	var sUrl = strings.Split(route.fullUrl, "/")
 	var urlBuf strings.Builder
-
 	// Build Host
 	if external {
 		schema := "http://"
@@ -367,7 +372,6 @@ func (app *App) UrlFor(name string, external bool, args ...string) string {
 			}
 		}
 	}
-
 	// Build path
 	for _, str := range sUrl {
 		if re.isVar.MatchString(str) {
@@ -385,7 +389,6 @@ func (app *App) UrlFor(name string, external bool, args ...string) string {
 			urlBuf.WriteString("/" + str)
 		}
 	}
-
 	// Build Query
 	var query strings.Builder
 	if len(params) > 0 {
@@ -397,11 +400,9 @@ func (app *App) UrlFor(name string, external bool, args ...string) string {
 	url := urlBuf.String()
 	url = re.slash2.ReplaceAllString(url, "/")
 	url = re.dot2.ReplaceAllString(url, ".")
-
 	if len(params) > 0 {
 		return host + url + strings.TrimSuffix(query.String(), "&")
 	}
-
 	return host + url
 }
 
@@ -465,7 +466,7 @@ func (app *App) Build(addr ...string) {
 }
 
 // Build a app and starter Server
-func (app *App) Listen(host ...string) error {
+func (app *App) Listen(host ...string) {
 	app.Build(host...)
 	_, port, err := net.SplitHostPort(app.srv.Addr)
 	if err != nil {
@@ -481,7 +482,7 @@ func (app *App) Listen(host ...string) error {
 			l.Default("Server is linsten in", app.srv.Addr)
 		}
 	}
-	return app.srv.ListenAndServe()
+	l.err.Fatal(app.srv.ListenAndServe())
 }
 
 // Build a app and starter Server

@@ -2,7 +2,6 @@ package slow
 
 import (
 	"fmt"
-	"net"
 	"regexp"
 	"strings"
 )
@@ -37,20 +36,26 @@ func (r *Router) parse() {
 	if r.Name == "" && !r.is_main {
 		panic(fmt.Errorf("the routers must be named"))
 	}
-
-	// DYNAMIC SUBDOMAINS ARE NOT A GOOD IDEA
 	if r.Subdomain != "" {
 		if servername == "" {
-			l.err.Fatal("to use subdomains you need to first add a ServerName in the 'app'")
+			panic("to use subdomains you need to first add a ServerName in the 'app'")
 		}
 		sub := r.Subdomain
 		if re.digit.MatchString(sub) {
-			l.err.Fatalf("router subdomain dont accept 'int' varible. Router: '%s'", r.Name)
+			panic(fmt.Sprintf("router subdomain dont accept 'int' varible. Router: '%s'", r.Name))
 		}
 		if re.filepath.MatchString(sub) {
-			l.err.Fatalf("router subdomain dont accept 'filepath' varible. Router: '%s'", r.Name)
+			panic(fmt.Sprintf("router subdomain dont accept 'filepath' varible. Router: '%s'", r.Name))
 		}
-		r.subdomainRegex = regexp.MustCompile(sub)
+		if re.str.MatchString(sub) {
+			sub = re.str.ReplaceAllString(sub, `(\w+)`)
+		} else {
+			sub = "(" + sub + ")"
+		}
+		sub = sub + `(.` + servername + `)`
+		r.subdomainRegex = regexp.MustCompile("^" + sub + "$")
+	} else if servername != "" {
+		r.subdomainRegex = regexp.MustCompile("^(" + servername + ")$")
 	}
 
 	for _, route := range r.Routes {
@@ -65,6 +70,9 @@ func (r *Router) parse() {
 			panic(fmt.Errorf("Route '%v' Prefix must start with slash or be a null String", r.Name))
 		}
 		route.fullUrl = r.Prefix + route.Url
+		if _, ok := r.routesByName[route.fullUrl]; ok {
+			panic(fmt.Errorf("Route with name '%s' already registered", r.Name))
+		}
 		re.slash2.ReplaceAllString(route.fullName, "/")
 
 		route.parse()
@@ -74,30 +82,11 @@ func (r *Router) parse() {
 
 func (r *Router) Match(ctx *Ctx) bool {
 	rq := ctx.Request
-	rqUrl := rq.Raw.Host
-	if servername != "" {
-		if !strings.Contains(rqUrl, servername) {
-			ctx.Request.Cancel()
-			return false
-		}
-	}
 	if r.subdomainRegex != nil {
-		if net.ParseIP(rqUrl) != nil {
+		if !r.subdomainRegex.MatchString(rq.URL.Host) {
 			return false
 		}
-		// só para garantir q a proxima etapa não quebre
-		if !strings.Contains(rqUrl, ".") {
-			return false
-		}
-		u := strings.Split(rqUrl, ".")[0]
-		// se o subdominio não der match
-		if !r.subdomainRegex.MatchString(u) {
-			return false
-		}
-	} else if rqUrl != servername {
-		ctx.Request.Cancel()
 	}
-
 	for _, route := range r.Routes {
 		if route.Match(ctx) {
 			ctx.MatchInfo.Router = r

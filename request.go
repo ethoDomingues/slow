@@ -9,6 +9,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"gopkg.in/yaml.v2"
@@ -37,40 +38,60 @@ type File struct {
 }
 
 func NewRequest(req *http.Request, ctx *Ctx) *Request {
-	return &Request{
+	req.URL.Host = req.Host
+	rq := &Request{
 		ctx:        ctx,
-		Raw:        req,
+		raw:        req,
+		URL:        req.URL,
 		Method:     req.Method,
 		RemoteAddr: req.RemoteAddr,
+		RequestURI: req.RequestURI,
+
+		ContentLength: int(req.ContentLength),
 
 		Args:    map[string]string{},
 		Mime:    map[string]string{},
 		Form:    map[string]any{},
 		Files:   map[string][]*File{},
 		Cookies: map[string]*http.Cookie{},
+
+		Header: Header(req.Header),
 	}
+	return rq
 }
 
 type Request struct {
-	Raw *http.Request
+	raw *http.Request
 
-	ctx *Ctx
+	ctx    *Ctx
+	Header Header
+
 	Body,
 	Method,
 	RemoteAddr,
+	RequestURI,
 	ContentType string
 
+	ContentLength int
+
+	URL     *url.URL
 	Form    map[string]any
 	Args    map[string]string
 	Mime    map[string]string
 	Query   map[string][]string
 	Files   map[string][]*File
 	Cookies map[string]*http.Cookie
+
+	TransferEncoding []string
+
+	Proto      string // "HTTP/1.0"
+	ProtoMajor int    // 1
+	ProtoMinor int    // 0
 }
 
 func (r *Request) parseHeaders() {
 	ctx := r.ctx
-	ct := r.Raw.Header.Get("Content-Type")
+	ct := r.raw.Header.Get("Content-Type")
 	mediaType, params, err := mime.ParseMediaType(ct)
 	if err != nil {
 		if err.Error() != "mime: no media type" {
@@ -82,7 +103,7 @@ func (r *Request) parseHeaders() {
 }
 
 func (r *Request) parseCookies() {
-	cs := r.Raw.Cookies()
+	cs := r.raw.Cookies()
 	for _, c := range cs {
 		r.Cookies[c.Name] = c
 	}
@@ -91,10 +112,8 @@ func (r *Request) parseCookies() {
 func (r *Request) parseBody() {
 	ctx := r.ctx
 	body := bytes.NewBuffer(nil)
-
-	body.Grow(int(r.Raw.ContentLength))
-	io.CopyBuffer(body, r.Raw.Body, nil)
-
+	body.Grow(int(r.ContentLength))
+	io.CopyBuffer(body, r.raw.Body, nil)
 	switch {
 	case r.ContentType == "", strings.HasPrefix(r.ContentType, "application/json"):
 		json.Unmarshal(body.Bytes(), &r.Form)
@@ -112,7 +131,6 @@ func (r *Request) parseBody() {
 			if err != nil {
 				ctx.Response.BadRequest()
 			}
-
 			if p.FileName() != "" {
 				file := NewFile(p)
 				r.Files[p.FormName()] = append(r.Files[p.FormName()], file)
@@ -126,7 +144,6 @@ func (r *Request) parseBody() {
 		}
 	}
 	r.Body = body.String()
-
 }
 
 func (r *Request) parseRequest() {
@@ -178,4 +195,32 @@ func (r *Request) UrlFor(name string, external bool, args ...string) string {
 func (r *Request) Ctx() *Ctx { return r.ctx }
 
 // Returns a 'context.Context' of the current request
-func (r *Request) Context() context.Context { return r.Raw.Context() }
+func (r *Request) Context() context.Context { return r.raw.Context() }
+
+func (r *Request) WithContext(ctx context.Context) *Request {
+	return NewRequest(r.raw.WithContext(ctx), r.ctx)
+}
+
+func (r *Request) Clone(ctx context.Context) *Request {
+	return NewRequest(r.raw.Clone(ctx), r.ctx)
+}
+
+func (r *Request) ProtoAtLeast(major, minor int) bool {
+	return r.ProtoMajor > major ||
+		r.ProtoMajor == major && r.ProtoMinor >= minor
+}
+
+func (r *Request) UserAgent() string {
+	return r.Header.Get("User-Agent")
+}
+
+func (r *Request) BasicAuth() (username, password string, ok bool) {
+	return r.raw.BasicAuth()
+}
+
+func (r *Request) RawRequest() *http.Request {
+	return r.raw
+}
+func (r *Request) Referer() string {
+	return r.raw.Referer()
+}

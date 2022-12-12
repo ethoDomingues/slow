@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -37,6 +36,7 @@ func SignJWT(headers, payload map[string]string, secret string) string {
 
 func ValidJWT(jwt, secret string) (*JWT, bool) {
 	if jwt != "" {
+		jwt = strings.TrimPrefix(jwt, "Bearer ")
 		hps := strings.Split(jwt, ".")
 		if len(hps) == 3 {
 			hb := fmt.Sprintf("%s.%s", hps[0], hps[1])
@@ -61,8 +61,8 @@ func ValidJWT(jwt, secret string) (*JWT, bool) {
 						}
 					}
 					if exp, ok := p["exp"]; ok {
-						tm, _ := strconv.Atoi(exp)
-						if time.Now().Before(time.Unix(int64(tm), 0)) {
+						t, err := time.Parse(time.RFC3339, exp)
+						if err == nil && time.Now().Before(t) {
 							return &JWT{Headers: h, Payload: p, Secret: secret}, true
 						}
 						return &JWT{Headers: h, Payload: p, Secret: secret}, false
@@ -76,6 +76,12 @@ func ValidJWT(jwt, secret string) (*JWT, bool) {
 }
 
 func NewJWT(secret string) *JWT {
+	if secret == "" {
+		panic("for use JWT, SecretKey is required")
+	}
+	return newJWT(secret)
+}
+func newJWT(secret string) *JWT {
 	return &JWT{
 		Payload: map[string]string{},
 		Headers: map[string]string{

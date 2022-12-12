@@ -6,36 +6,37 @@ import (
 	"strings"
 )
 
-type Headers map[string][]string
+type Header http.Header
 
 // Set a Header
-func (h *Headers) Set(key string, value string) {
+func (h *Header) Set(key string, value string) {
 	textproto.MIMEHeader(*(h)).Set(key, value)
 }
 
 // Add value in a in Header Key. If the key does not exist, it is created
-func (h *Headers) Add(key string, value string) {
+func (h *Header) Add(key string, value string) {
 	textproto.MIMEHeader(*(h)).Add(key, value)
 }
 
 // Return a value of Header Key. If the key does not exist, return a empty string
-func (h *Headers) Get(key string) string {
+func (h *Header) Get(key string) string {
 	return textproto.MIMEHeader(*(h)).Get(key)
 }
 
-func (h *Headers) Del(key string) {
+func (h *Header) Del(key string) {
 	textproto.MIMEHeader(*(h)).Del(key)
 }
 
 // Set a Cookie. Has the same effect as 'Response.SetCookie'
-func (h *Headers) SetCookie(cookie *http.Cookie) {
-	if v := cookie.String(); v != "" {
-		h.Add("Set-Cookie", v)
-	}
+func (h *Header) SetCookie(cookie *http.Cookie) {
+	// http.Header(*h)
+	// if v := cookie.String(); v != "" {
+	// 	h.Add("Set-Cookie", v)
+	// }
 }
 
 // Write the headers in the response
-func (h *Headers) Save(w http.ResponseWriter) {
+func (h *Header) Save(w http.ResponseWriter) {
 	for key := range *(h) {
 		w.Header().Set(key, h.Get(key))
 	}
@@ -52,7 +53,7 @@ type Cors struct {
 	AllowCredentials bool     // Access-Control-Allow-Credentials
 }
 
-func (c *Cors) parse(h *Headers) {
+func (c *Cors) parse(h *Header) {
 	if c.MaxAge != "" {
 		h.Set("Access-Control-Max-Age", c.MaxAge)
 	}

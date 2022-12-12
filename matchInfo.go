@@ -37,10 +37,9 @@ type _re struct {
 var (
 	// isIPAddress = regexp.MustCompile(`^(([0-9]|[1-9][0-9]|[1][0-9][0-9]|[2][0-5][0-5])([.])){3}([0-9]|[1-9][0-9]|[1][0-9][0-9]|[2][0-5][0-5])(:(\d+))$`)
 
-	isStr      = regexp.MustCompile(`{\w+(:str)?[?]?}`)
-	isVar      = regexp.MustCompile(`{\w+(\:(int|str|filepath))?[?]?}`)
-	isVarOpt   = regexp.MustCompile(`{\w+(\:(int|str))?[\?]}`)
-	isDigit    = regexp.MustCompile(`{\w+:int[?]?}`)
+	isStr      = regexp.MustCompile(`{\w+(:str)?}`)
+	isVar      = regexp.MustCompile(`{\w+(\:(int|str|filepath))?`)
+	isDigit    = regexp.MustCompile(`{\w+:int}`)
 	isFilepath = regexp.MustCompile(`{\w+:filepath}`)
 
 	dot2      = regexp.MustCompile(`[.]{2,}`)
@@ -50,7 +49,6 @@ var (
 	re = _re{
 		str:      isStr,
 		isVar:    isVar,
-		isVarOpt: isVarOpt,
 		digit:    isDigit,
 		filepath: isFilepath,
 		dot2:     dot2,

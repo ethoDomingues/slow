@@ -13,7 +13,7 @@ func serveFile(ctx *Ctx) {
 	rsp := ctx.Response
 	rq := ctx.Request
 
-	uri := rq.Raw.URL.Path
+	uri := rq.URL.Path
 	static := ctx.App.StaticUrlPath
 
 	pathToFile := strings.TrimPrefix(uri, static)
@@ -34,7 +34,7 @@ func serveFile(ctx *Ctx) {
 			ctype = http.DetectContentType(rsp.Body.Bytes())
 		}
 
-		rsp.Headers.Set("Content-Type", ctype)
+		rsp.Header.Set("Content-Type", ctype)
 		rsp.Close()
 	} else {
 		rsp.NotFound()
@@ -47,8 +47,8 @@ func optionsHandler(ctx *Ctx) {
 
 	rsp.StatusCode = 200
 	strMeths := strings.Join(mi.Route.Cors.AllowMethods, ", ")
-	rsp.Headers.Set("Access-Control-Allow-Methods", strMeths)
+	rsp.Header.Set("Access-Control-Allow-Methods", strMeths)
 
 	rsp.parseHeaders()
-	rsp.Headers.Save(rsp.raw)
+	rsp.Header.Save(rsp.raw)
 }

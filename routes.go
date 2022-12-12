@@ -40,7 +40,7 @@ func (r *Route) compileUrl() {
 	url = strings.TrimSuffix(url, "/")
 	strs := strings.Split(url, "/")
 
-	for i, str := range strs {
+	for _, str := range strs {
 		if str == "" {
 			continue
 		}
@@ -51,18 +51,9 @@ func (r *Route) compileUrl() {
 			re.slash2.ReplaceAllString(str, "/")
 		}
 		if re.isVar.MatchString(str) {
-			if re.isVarOpt.MatchString(str) {
-				if i != len(strs)-1 {
-					l.err.Fatal("optional url var must be last")
-				}
-				str = re.str.ReplaceAllString(str, `(([\x00-\x7F]+)([^\\\/\s]+)|\d+)?`)
-				str = re.digit.ReplaceAllString(str, `(\d+)?`)
-				str = re.filepath.ReplaceAllString(str, `([\/\w+.-]+)?`)
-			} else {
-				str = re.str.ReplaceAllString(str, `(([\x00-\x7F]+)([^\\\/\s]+)|\d+)`)
-				str = re.digit.ReplaceAllString(str, `(\d+)`)
-				str = re.filepath.ReplaceAllString(str, `([\/\w+.-]+)`)
-			}
+			str = re.str.ReplaceAllString(str, `(([\x00-\x7F]+)([^\\\/\s]+)|\d+)`)
+			str = re.digit.ReplaceAllString(str, `(\d+)`)
+			str = re.filepath.ReplaceAllString(str, `([\/\w+.-]+)`)
 		}
 		r.urlRegex = append(r.urlRegex, regexp.MustCompile(fmt.Sprintf("^%s$", str)))
 	}
@@ -75,19 +66,17 @@ func (r *Route) parse() {
 	if r.Func == nil && r.MapCtrl == nil {
 		l.err.Fatalf("Route '%s' need a func or Ctrl\n", r.fullName)
 	}
-
 	r.compileUrl()
 	ctrl := MapCtrl{
 		"OPTIONS": &Meth{
 			Method: "OPTIONS",
 		},
 	}
-
 	strMth := map[string]any{}
 	for verb, meth := range r.MapCtrl {
 		v := strings.ToUpper(verb)
 		if !reMethods.MatchString(v) {
-			panic(fmt.Errorf("route '%s' has invalid Request Method: '%s'", r.fullName, verb))
+			l.err.Fatalf("route '%s' has invalid Request Method: '%s'", r.fullName, verb)
 		}
 		ctrl[v] = meth
 		strMth[v] = nil
@@ -97,7 +86,7 @@ func (r *Route) parse() {
 	for _, verb := range r.Methods {
 		v := strings.ToUpper(verb)
 		if !reMethods.MatchString(v) {
-			panic(fmt.Errorf("route '%s' has invalid Request Method: '%s'", r.fullName, verb))
+			l.err.Fatalf("route '%s' has invalid Request Method: '%s'", r.fullName, verb)
 		}
 		if _, ok := r.MapCtrl[v]; !ok {
 			r.MapCtrl[v] = &Meth{
@@ -130,17 +119,15 @@ func (r *Route) parse() {
 }
 
 func (r *Route) matchURL(ctx *Ctx, url string) bool {
-	url = strings.TrimPrefix(url, "/")
-	url = strings.TrimSuffix(url, "/")
-	urlSplit := strings.Split(url, "/")
+	nurl := strings.TrimPrefix(url, "/")
+	nurl = strings.TrimSuffix(nurl, "/")
+	urlSplit := strings.Split(nurl, "/")
 
 	lSplit := len(urlSplit)
 	lRegex := len(r.urlRegex)
 
 	if lSplit != lRegex {
-		if !re.isVarOpt.MatchString(r.Url) && lSplit != lRegex-1 {
-			return false
-		}
+		return false
 	}
 	for i, uRe := range r.urlRegex {
 		str := ""
@@ -156,28 +143,26 @@ func (r *Route) matchURL(ctx *Ctx, url string) bool {
 
 func (r *Route) Match(ctx *Ctx) bool {
 	mi := ctx.MatchInfo
-
 	rq := ctx.Request
 	m := rq.Method
+	url := rq.URL.Path
 
-	if !r.matchURL(ctx, rq.Raw.URL.Path) {
+	if !r.matchURL(ctx, url) {
 		if !re.filepath.MatchString(r.fullUrl) {
 			return false
 		}
-		if !strings.HasPrefix(rq.Raw.URL.Path, ctx.App.StaticUrlPath) {
+		if !strings.HasPrefix(rq.URL.Path, ctx.App.StaticUrlPath) {
 			return false
 		}
 	}
 
 	if meth, ok := r.MapCtrl[m]; ok {
 		mi.MethodNotAllowed = nil
-
 		if meth.Func != nil {
 			mi.Func = meth.Func
 		}
 		mi.Match = true
 		mi.Route = r
-
 		return true
 	}
 	mi.MethodNotAllowed = ErrorMethodMismatch

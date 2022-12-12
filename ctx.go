@@ -30,8 +30,6 @@ type Ctx struct {
 
 	// Contains information about the current request and the route
 	MatchInfo *MatchInfo
-
-	cancel bool
 }
 
 func (ctx *Ctx) UrlFor(name string, external bool, args ...string) string {

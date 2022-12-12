@@ -16,7 +16,7 @@ func NewResponse(wr http.ResponseWriter, ctx *Ctx) *Response {
 		raw:        wr,
 		ctx:        ctx,
 		Body:       bytes.NewBufferString(""),
-		Headers:    &Headers{},
+		Header:     &Header{},
 		StatusCode: 200,
 	}
 }
@@ -24,8 +24,8 @@ func NewResponse(wr http.ResponseWriter, ctx *Ctx) *Response {
 type Response struct {
 	StatusCode int
 
-	Body    *bytes.Buffer
-	Headers *Headers
+	Body   *bytes.Buffer
+	Header *Header
 
 	ctx *Ctx
 	raw http.ResponseWriter
@@ -36,14 +36,14 @@ func (r *Response) parseHeaders() {
 	method := ctx.Request.Method
 	routerCors := ctx.MatchInfo.Router.Cors
 	if routerCors != nil {
-		routerCors.parse(r.Headers)
+		routerCors.parse(r.Header)
 	}
 	routeCors := ctx.MatchInfo.Route.Cors
 	if routeCors != nil {
-		routeCors.parse(r.Headers)
+		routeCors.parse(r.Header)
 	}
 	if method == "OPTIONS" {
-		h := *(r.Headers)
+		h := *(r.Header)
 		if _, ok := h["Access-Control-Allow-Origin"]; !ok {
 			h.Set("Access-Control-Allow-Origin", ctx.App.Servername)
 		}
@@ -59,21 +59,21 @@ func (r *Response) parseHeaders() {
 		if _, ok := h["Access-Control-Allow-Credentials"]; !ok {
 			h.Set("Access-Control-Allow-Credentials", "false")
 		}
-	} else if ctx.Request.Raw.Method == "HEAD" {
+	} else if ctx.Request.Method == "HEAD" {
 		r.Body.Reset()
 	}
 }
 
 // Set a cookie in the Headers of Response
-func (r *Response) SetCookie(cookie *http.Cookie) { r.Headers.SetCookie(cookie) }
+func (r *Response) SetCookie(cookie *http.Cookie) { r.Header.SetCookie(cookie) }
 
 // Redirect to Following URL
 func (r *Response) Redirect(url string) {
 	r.Body.Reset()
-	r.Headers.Set("Location", url)
+	r.Header.Set("Location", url)
 	r.StatusCode = 302
 
-	r.Headers.Set("Content-Type", "text/html; charset=utf-8")
+	r.Header.Set("Content-Type", "text/html; charset=utf-8")
 	r.Body.WriteString("<a href=\"" + HtmlEscape(url) + "\"> Manual Redirect </a>.\n")
 	panic(ErrHttpAbort)
 }
@@ -86,7 +86,7 @@ func (r *Response) JSON(body any, code int) {
 		panic(err)
 	}
 	r.StatusCode = code
-	r.Headers.Set("Content-Type", "application/json")
+	r.Header.Set("Content-Type", "application/json")
 	r.Body.Write(j)
 	panic(ErrHttpAbort)
 }
@@ -95,7 +95,7 @@ func (r *Response) TEXT(body string, code int) {
 	r.Body.Reset()
 
 	r.StatusCode = code
-	r.Headers.Set("Content-Type", "text/plain")
+	r.Header.Set("Content-Type", "text/plain")
 	r.Body.WriteString(body)
 	panic(ErrHttpAbort)
 }
@@ -104,7 +104,7 @@ func (r *Response) HTML(body string, code int) {
 	r.Body.Reset()
 
 	r.StatusCode = code
-	r.Headers.Set("Content-Type", "text/html")
+	r.Header.Set("Content-Type", "text/html")
 	r.Body.WriteString(body)
 	panic(ErrHttpAbort)
 }
@@ -160,7 +160,7 @@ func (r *Response) RenderTemplate(pathToFile string, data ...any) {
 
 // Abort the current request. Server does not respond to client
 func (r *Request) Cancel() {
-	r.Raw.Context().Done()
+	r.Context().Done()
 }
 
 // Stops execution, cleans up the response body, and writes the StatusCode to the response
