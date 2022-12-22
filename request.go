@@ -100,6 +100,9 @@ func (r *Request) parseHeaders() {
 	}
 	r.ContentType = mediaType
 	r.Mime = params
+	mi := r.ctx.MatchInfo
+	r.Query = r.URL.Query()
+	r.Args = re.getUrlValues(mi.Route.fullUrl, r.URL.Path)
 }
 
 func (r *Request) parseCookies() {

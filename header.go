@@ -53,7 +53,7 @@ type Cors struct {
 	AllowCredentials bool     // Access-Control-Allow-Credentials
 }
 
-func (c *Cors) parse(h *Header) {
+func (c *Cors) parse(h Header) {
 	if c.MaxAge != "" {
 		h.Set("Access-Control-Max-Age", c.MaxAge)
 	}

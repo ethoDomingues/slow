@@ -256,16 +256,14 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	ctx.Response = rsp
 
 	defer app.closeConn(ctx)
-	rq.parseRequest()
 	if app.SecretKey != "" {
 		if c, ok := rq.Cookies["session"]; ok {
 			ctx.Session.validate(c, app.SecretKey)
 		}
 	}
-	mi := ctx.MatchInfo
+
 	if app.Match(ctx) {
-		rq.Query = req.URL.Query()
-		rq.Args = re.getUrlValues(mi.Route.fullUrl, req.URL.Path)
+		rq.parseRequest()
 		app.execRoute(ctx)
 	} else if app.TearDownRequest != nil {
 		app.TearDownRequest(ctx)

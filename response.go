@@ -16,7 +16,7 @@ func NewResponse(wr http.ResponseWriter, ctx *Ctx) *Response {
 		raw:        wr,
 		ctx:        ctx,
 		Body:       bytes.NewBufferString(""),
-		Header:     &Header{},
+		Header:     Header{},
 		StatusCode: 200,
 	}
 }
@@ -25,7 +25,7 @@ type Response struct {
 	StatusCode int
 
 	Body   *bytes.Buffer
-	Header *Header
+	Header Header
 
 	ctx *Ctx
 	raw http.ResponseWriter
@@ -43,7 +43,7 @@ func (r *Response) parseHeaders() {
 		routeCors.parse(r.Header)
 	}
 	if method == "OPTIONS" {
-		h := *(r.Header)
+		h := r.Header
 		if _, ok := h["Access-Control-Allow-Origin"]; !ok {
 			h.Set("Access-Control-Allow-Origin", ctx.App.Servername)
 		}

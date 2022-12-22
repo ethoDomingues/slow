@@ -65,8 +65,11 @@ func (l *logger) Error(v ...any) {
 	if l.logFile != nil {
 		l.logFile.Println(v...)
 	}
-	for i := 1; i < 10; i++ {
-		_, file, line, _ := runtime.Caller(i)
+	for i := 1; i < 15; i++ {
+		_, file, line, ok := runtime.Caller(i)
+		if !ok {
+			return
+		}
 		fmt.Printf("\t%s:%d\n", file, line)
 	}
 }
@@ -88,7 +91,7 @@ func (l *logger) LogRequest(ctx *Ctx) {
 	default:
 		color = _WHITE
 	}
-	l.info.Println(color, rsp.StatusCode, _RESET, "-> ", rq.Method, rq.URL.Path)
+	l.info.Printf("%s%d%s -> %s -> %s", color, rsp.StatusCode, _RESET, rq.Method, rq.URL.Path)
 	if l.logFile != nil {
 		l.logFile.Printf("%d -> %s %s%s", rsp.StatusCode, rq.Method, rq.URL.Host, rq.URL.Path)
 	}
