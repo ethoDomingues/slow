@@ -51,16 +51,17 @@ func NewApp() *App {
 type App struct {
 	*Router
 
-	SecretKey, // for sign session
-	Servername, // for build url routes and route match
-	StaticFolder, // for serve static files
-	TemplateFolder, // for render template (html) files
-	StaticUrlPath, // url uf request static file
-	LogFile, // save log info in file
-	Env string // environmnt
+	Env            string // environmnt
+	LogFile        string // save log info in file
+	SecretKey      string // for sign session
+	Servername     string // for build url routes and route match
+	StaticFolder   string // for serve static files
+	StaticUrlPath  string // url uf request static file
+	TemplateFolder string // for render template (html) files
 
-	Silent       bool //don't print logs
-	EnableStatic bool // enable static endpoint for serving static files
+	Silent         bool // don't print logs
+	EnableStatic   bool // enable static endpoint for serving static files
+	ListeningInTLS bool // UrlFor return a URl with schema in "https:"
 
 	routers      []*Router
 	routerByName map[string]*Router
@@ -355,7 +356,7 @@ func (app *App) UrlFor(name string, external bool, args ...string) string {
 	// Build Host
 	if external {
 		schema := "http://"
-		if len(app.srv.TLSConfig.Certificates) > 0 {
+		if app.ListeningInTLS || len(app.srv.TLSConfig.Certificates) > 0 {
 			schema = "https://"
 		}
 		if router.Subdomain != "" {
