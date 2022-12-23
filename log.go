@@ -91,7 +91,7 @@ func (l *logger) LogRequest(ctx *Ctx) {
 	default:
 		color = _WHITE
 	}
-	l.info.Printf("%s%d%s -> %s -> %s", color, rsp.StatusCode, _RESET, rq.Method, rq.URL.Path)
+	l.info.Printf("%s%d%s -> %s -> [%s] %s", color, rsp.StatusCode, _RESET, rq.Method, ctx.MatchInfo.Router.Subdomain, rq.URL.Path)
 	if l.logFile != nil {
 		l.logFile.Printf("%d -> %s %s%s", rsp.StatusCode, rq.Method, rq.URL.Host, rq.URL.Path)
 	}

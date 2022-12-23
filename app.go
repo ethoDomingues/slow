@@ -347,8 +347,6 @@ func (app *App) UrlFor(name string, external bool, args ...string) string {
 	}
 	if route == nil {
 		panic(fmt.Sprintf("Route '%s' is undefined \n", name))
-
-		// l.err.Panicln("route '" + name + "' is not found")
 	}
 	// Pre Build
 	var sUrl = strings.Split(route.fullUrl, "/")
