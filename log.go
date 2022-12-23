@@ -106,11 +106,10 @@ func (l *logger) LogRequest(ctx *Ctx) {
 		rd = rq.RemoteAddr
 	}
 	if rd != "" {
-		rd = "rAddr [" + rd + "]"
+		rd = "[" + rd + "]"
 	}
-	l.info.Printf("%s%d%s -> %s -> %s %s", color, rsp.StatusCode, _RESET, rq.Method, rd, addr)
+	l.info.Printf("%s %s%d%s -> %s -> %s", rd, color, rsp.StatusCode, _RESET, rq.Method, addr)
 	if l.logFile != nil {
-		l.logFile.Printf("%d -> %s -> %s %s", rsp.StatusCode, rq.Method, rd, addr)
-		// l.logFile.Printf("%d -> %s %s%s", rsp.StatusCode, rq.Method, rq.URL.Host, rq.URL.Path)
+		l.logFile.Printf("%s %d -> %s -> %s", rd, rsp.StatusCode, rq.Method, addr)
 	}
 }
