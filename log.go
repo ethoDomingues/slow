@@ -91,8 +91,20 @@ func (l *logger) LogRequest(ctx *Ctx) {
 	default:
 		color = _WHITE
 	}
-	l.info.Printf("%s%d%s -> %s -> [%s] %s", color, rsp.StatusCode, _RESET, rq.Method, ctx.MatchInfo.Router.Subdomain, rq.URL.Path)
+	sub := ctx.MatchInfo.Router.Subdomain
+	if sub != "" {
+		sub = "[" + sub + "]"
+	}
+	rd := rq.Header.Get("X-Real-Ip")
+	if rd == "" {
+		rd = rq.RemoteAddr
+	}
+	if rd != "" {
+		rd = "rAddr[" + rd + "]"
+	}
+	l.info.Printf("%s%d%s -> %s -> %s %s %s", color, rsp.StatusCode, _RESET, rq.Method, rd, sub, rq.URL.Path)
 	if l.logFile != nil {
-		l.logFile.Printf("%d -> %s %s%s", rsp.StatusCode, rq.Method, rq.URL.Host, rq.URL.Path)
+		l.logFile.Printf("%d -> %s -> %s %s %s", rsp.StatusCode, rq.Method, rd, sub, rq.URL.Path)
+		// l.logFile.Printf("%d -> %s %s%s", rsp.StatusCode, rq.Method, rq.URL.Host, rq.URL.Path)
 	}
 }
