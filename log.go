@@ -91,14 +91,17 @@ func (l *logger) LogRequest(ctx *Ctx) {
 	default:
 		color = _WHITE
 	}
-	addr := ctx.MatchInfo.Router.Subdomain
+	addr := ""
+	if ctx.MatchInfo.Router != nil {
+		addr = ctx.MatchInfo.Router.Subdomain
+	}
 	if addr != "" {
 		addr = addr + ".[...]" + rq.URL.Path
 	} else {
 		addr = rq.URL.Path
 	}
 
-	rd := rq.Header.Get("X-Real-Ip")
+	rd := rq.Header.Get("X-Real-Ip") // nginx cfg
 	if rd == "" {
 		rd = rq.RemoteAddr
 	}
