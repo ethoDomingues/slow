@@ -91,10 +91,13 @@ func (l *logger) LogRequest(ctx *Ctx) {
 	default:
 		color = _WHITE
 	}
-	sub := ctx.MatchInfo.Router.Subdomain
-	if sub != "" {
-		sub = sub + ".[...]"
+	addr := ctx.MatchInfo.Router.Subdomain
+	if addr != "" {
+		addr = addr + ".[...]" + rq.URL.Path
+	} else {
+		addr = rq.URL.Path
 	}
+
 	rd := rq.Header.Get("X-Real-Ip")
 	if rd == "" {
 		rd = rq.RemoteAddr
@@ -102,9 +105,9 @@ func (l *logger) LogRequest(ctx *Ctx) {
 	if rd != "" {
 		rd = "rAddr [" + rd + "]"
 	}
-	l.info.Printf("%s%d%s -> %s -> %s %s %s", color, rsp.StatusCode, _RESET, rq.Method, rd, sub, rq.URL.Path)
+	l.info.Printf("%s%d%s -> %s -> %s %s", color, rsp.StatusCode, _RESET, rq.Method, rd, addr)
 	if l.logFile != nil {
-		l.logFile.Printf("%d -> %s -> %s %s %s", rsp.StatusCode, rq.Method, rd, sub, rq.URL.Path)
+		l.logFile.Printf("%d -> %s -> %s %s", rsp.StatusCode, rq.Method, rd, addr)
 		// l.logFile.Printf("%d -> %s %s%s", rsp.StatusCode, rq.Method, rq.URL.Host, rq.URL.Path)
 	}
 }
