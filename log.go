@@ -93,14 +93,14 @@ func (l *logger) LogRequest(ctx *Ctx) {
 	}
 	sub := ctx.MatchInfo.Router.Subdomain
 	if sub != "" {
-		sub = "[" + sub + "]"
+		sub = sub + ".[...]"
 	}
 	rd := rq.Header.Get("X-Real-Ip")
 	if rd == "" {
 		rd = rq.RemoteAddr
 	}
 	if rd != "" {
-		rd = "rAddr[" + rd + "]"
+		rd = "rAddr [" + rd + "]"
 	}
 	l.info.Printf("%s%d%s -> %s -> %s %s %s", color, rsp.StatusCode, _RESET, rq.Method, rd, sub, rq.URL.Path)
 	if l.logFile != nil {
