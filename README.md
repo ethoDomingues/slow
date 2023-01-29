@@ -1,6 +1,6 @@
 # Slow
 
-## [See the Documentation]("/ethoDomingues/slow/blob/main/doc.md")
+## [See the Documentation](https://github.com/ethoDomingues/slow/blob/main/doc.md)
 
 <br>
 

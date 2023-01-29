@@ -39,11 +39,16 @@ func (r *Response) parseHeaders() {
 		routerCors.parse(r.Header)
 	}
 	routeCors := ctx.MatchInfo.Route.Cors
+	h := r.Header
 	if routeCors != nil {
 		routeCors.parse(r.Header)
 	}
+	if routerCors != nil || routeCors != nil {
+		if _, ok := h["Access-Control-Request-Method"]; !ok {
+			h.Set("Access-Control-Request-Method", method)
+		}
+	}
 	if method == "OPTIONS" {
-		h := r.Header
 		if _, ok := h["Access-Control-Allow-Origin"]; !ok {
 			h.Set("Access-Control-Allow-Origin", ctx.App.Servername)
 		}
@@ -52,9 +57,6 @@ func (r *Response) parseHeaders() {
 		}
 		if _, ok := h["Access-Control-Expose-Headers"]; !ok {
 			h.Set("Access-Control-Expose-Headers", "")
-		}
-		if _, ok := h["Access-Control-Request-Method"]; !ok {
-			h.Set("Access-Control-Request-Method", method)
 		}
 		if _, ok := h["Access-Control-Allow-Credentials"]; !ok {
 			h.Set("Access-Control-Allow-Credentials", "false")
