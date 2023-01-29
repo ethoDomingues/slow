@@ -30,12 +30,10 @@ var (
 
 // Returns a new app with a default settings
 func NewApp() *App {
-	router := &Router{
-		Name:         "",
-		Routes:       []*Route{},
-		is_main:      true,
-		routesByName: map[string]*Route{},
-	}
+	router := NewRouter("main")
+	router.Name = ""
+	router.is_main = true
+
 	app := &App{
 		Router:         router,
 		routers:        []*Router{router},
@@ -87,8 +85,30 @@ func (app *App) build() {
 	if app.built {
 		return
 	}
+
 	if app.EnableStatic {
 		app.GET("/assets/{filepath:filepath}", serveFile)
+	}
+	// se o usuario mudar o router principal,
+	// isso evita alguns erro
+	if !app.is_main {
+		if app.Router.routesByName == nil {
+			app.Router.routesByName = map[string]*Route{}
+		}
+		if app.Router.Cors == nil {
+			app.Router.Cors = &Cors{}
+		}
+		if app.Router.Cors == nil {
+			app.Router.Cors = &Cors{}
+		}
+		if app.Router.Middlewares == nil {
+			app.Router.Middlewares = NewMiddleware(nil)
+		}
+		if app.Router.Routes == nil {
+			app.Router.Routes = []*Route{}
+		}
+
+		app.is_main = true
 	}
 	for _, router := range app.routers {
 		router.parse()
@@ -96,9 +116,7 @@ func (app *App) build() {
 			maps.Copy(app.routesByName, router.routesByName)
 		}
 	}
-	if app.Router.Name != "" {
-		app.routerByName[app.Router.Name] = app.Router
-	}
+	app.routerByName[app.Router.Name] = app.Router
 }
 
 func (app *App) closeConn(ctx *Ctx) {
@@ -226,7 +244,7 @@ func (app *App) listRoutes() {
 	fmt.Printf("+-%s-+-%s-+-%s-+\n", line1, line2, line3)
 }
 
-func (app *App) Match(ctx *Ctx) bool {
+func (app *App) match(ctx *Ctx) bool {
 	rq := ctx.Request
 
 	if servername != "" {
@@ -240,7 +258,7 @@ func (app *App) Match(ctx *Ctx) bool {
 	}
 
 	for _, router := range app.routers {
-		if router.Match(ctx) {
+		if router.match(ctx) {
 			return true
 		}
 	}
@@ -263,7 +281,7 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	if app.Match(ctx) {
+	if app.match(ctx) {
 		rq.parseRequest()
 		app.execRoute(ctx)
 	} else if app.TearDownRequest != nil {
@@ -320,7 +338,7 @@ func (app *App) UrlFor(name string, external bool, args ...string) string {
 		router *Router
 	)
 	if app.srv == nil {
-		l.err.Fatalf("vc esta tentando usar essa função fora de um contexto")
+		l.err.Fatalf("you are trying to use this function outside of a context")
 	}
 	if len(args)%2 != 0 {
 		l.err.Fatalf("numer of args of build url, is invalid: UrlFor only accept pairs of args ")
@@ -407,7 +425,7 @@ func (app *App) UrlFor(name string, external bool, args ...string) string {
 func (app *App) ShowRoutes() { app.listRoutes() }
 
 /*
-Build app & server, but not start serve
+Build the App, but not start serve
 
 example:
 
@@ -463,7 +481,7 @@ func (app *App) Build(addr ...string) {
 }
 
 // Build a app and starter Server
-func (app *App) Listen(host ...string) {
+func (app *App) Listen(host ...string) error {
 	app.Build(host...)
 	_, port, err := net.SplitHostPort(app.srv.Addr)
 	if err != nil {
@@ -479,7 +497,7 @@ func (app *App) Listen(host ...string) {
 			l.Default("Server is linsten in", app.srv.Addr)
 		}
 	}
-	l.err.Fatal(app.srv.ListenAndServe())
+	return app.srv.ListenAndServe()
 }
 
 // Build a app and starter Server

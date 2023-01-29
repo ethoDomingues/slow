@@ -80,7 +80,7 @@ func (r *Router) parse() {
 	}
 }
 
-func (r *Router) Match(ctx *Ctx) bool {
+func (r *Router) match(ctx *Ctx) bool {
 	rq := ctx.Request
 	if r.subdomainRegex != nil {
 		if !r.subdomainRegex.MatchString(rq.URL.Host) {
@@ -88,7 +88,7 @@ func (r *Router) Match(ctx *Ctx) bool {
 		}
 	}
 	for _, route := range r.Routes {
-		if route.Match(ctx) {
+		if route.match(ctx) {
 			ctx.MatchInfo.Router = r
 			return true
 		}

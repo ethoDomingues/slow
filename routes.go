@@ -141,7 +141,7 @@ func (r *Route) matchURL(ctx *Ctx, url string) bool {
 	return true
 }
 
-func (r *Route) Match(ctx *Ctx) bool {
+func (r *Route) match(ctx *Ctx) bool {
 	mi := ctx.MatchInfo
 	rq := ctx.Request
 	m := rq.Method
