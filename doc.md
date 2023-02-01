@@ -79,6 +79,7 @@
 
   - **AfterRequest( )** [Func](#func)
       > is exec after each handler ( 'if not raise a error' )
+
       ```go
       app.AfterRequest = func(ctx *slow.Ctx) {
             // do anything here
@@ -151,14 +152,37 @@
 
 - ### App Example
 
-        ...
+    [**Full example here**](https://github.com/ethodomingues/slow_example)
+
+    ```go
+    package main
+
+    import "github.com/ethodomingues/slow"
+
+    func main() {
+        app := slow.NewApp()
+        app.GET("/",index)
+        app.GET("/{name}",dynamicRoute)
+        app.Listen()
+    }
+
+    func index(ctx *slow.Ctx) {
+        ctx.Response.HTML("<h1>Hello World!</h1>")
+    }
+
+    func dynamicRoute(ctx *slow.Ctx) {
+        name := ctx.Request.Args["name"]
+        ctx.Response.HTML("<h1>Hello, "+name+"!</h1>")
+    }
+    ```
 
 ## Cors
 >
 > If present on route or router, allows resource sharing between origins
 
 - ### Cors Attributes
-  
+  >
+  > [CORS documentation](https://developer.mozilla.org/pt-BR/docs/Web/HTTP/CORS)
   - **MaxAge** _string_
       > Access-Control-Max-Age
 
@@ -180,9 +204,26 @@
   - **AllowCredentials** _bool_
       > Access-Control-Allow-Credentials
 
-- ### Cors Example
+- ### CORS Example
 
-        ...
+    ```go
+    func main() {
+        router := slow.Router{
+            Name:"api",
+            Prefix:"/v1",
+            Subdomain:"api",
+            Cors: &slow.Cors{
+                MaxAge:"36000",
+                AllowOrigin:"*",
+                AllowMethods:[]string{"GET","POST"},      // automatic answer
+                AllowHeaders:[]string{"Authorization"},   // automatic answer
+                ExposeHeaders:[]string{"Authorization"},
+                RequestMethod:"GET",                      // automatic answer
+                AllowCredentials: true,
+            },
+        }
+    }
+    ```
 
 ## Ctx
 
@@ -229,7 +270,9 @@
 
 - ### Ctx Example
 
-            ...
+    ```go
+
+    ```
 
 ## File
 
@@ -260,6 +303,13 @@
 >
 > **func( \*[Ctx](#ctx)** )
 
+```go
+func index(ctx *slow.Ctx) {
+    body := map[string]string{"hello":"world"}
+    ctx.Response.JSON(, 200)
+}
+```
+
 ## Header
  >
  > **http.Header**
@@ -286,7 +336,15 @@
 
 - ### Header Example
 
-            ...
+```go
+func index(ctx *slow.Ctx) {
+    body := map[string]string{"hello":"world"}
+
+    ctx.Response.Header.Set("X-Token","tokenValue")
+    ctx.Response.Header.Set("X-Header","value")
+    ctx.Response.JSON(, 200)
+}
+```
 
 ## JWT
 
@@ -320,49 +378,47 @@
 
 - ### MapCtrl Example
 
-        ...
+```go
+var Routes = []*slow.Route{
+    {
+        Url:"/login",
+        Name:"loginRoute",
+        MapCtrl: slow.MapCtrl{
+            "GET":{Func:func1},
+            "POST":{Func:func2},
+            "PUT":{Func:func3},
+        },
+    },
+}
+```
 
 ## MatchInfo
 
 - ### MatchInfo Attibutes
 
   - **Func** _*[Func](#func)_
-      > ...
-
+  
   - **Match** _bool_
-      > ...
 
   - **MethodNotAllowed** _error_
-      > ...
 
   - **Route**  _*[Route](#route)_
-      > ...
 
   - **Router** _*[Router](#router)_
-      > ...
 
-- ### MatchInfo Example
-
-            ...
-  
 ## Meth
 
 - ### Meth Attibutes
 
   - **[Func](#func)** _*Func_
-      > ...
 
   - **Method** _string_
-      > ...
 
-  - **Schema** _[Schema](#schema)_
-      > ...
+  - **[Schema](#schema)** _[Schema](#schema)_
 
 ## Methods
 
 > [ ]string
-
-- ### Methods Example
 
 ## Middlewares
 
@@ -371,11 +427,29 @@
 - ### Middlewares Methods
 
   - **NewMiddleware(** _f ...[Func](#func)_ **) ->** _Middlewares_
-      > ...
 
 - ### Middlewares Example
 
-        ...
+```go
+func mid1(ctx *slow.Ctx) {
+    // is executed fist, after "app.BeforeRequest"
+    return
+}
+
+func mid2(ctx *slow.Ctx) {
+    // is executed 2°
+    return
+}
+
+func index(ctx *slow.Ctx) {
+    // runs after all "mids", if not aborted or has an error
+}
+func main(){
+    ...
+    app.Middlewares = NewMiddleware(mid1,mid2)
+    ...
+}
+```
 
 ## Request
 
@@ -477,20 +551,36 @@
 
 - ### Request Example
 
+```go
+// route url -> /api/user/{userID:int}
+func index(ctx *slow.Ctx) {
+    req := ctx.Request
+    userID := req.Args["userID"]
+
+    if req.Method == "POST" {
+        data := req.Form
+        username := req.Form["username"]
+        user, passwd, ok := req.BasicAuth()
         ...
+    }
+    ...
+}
+```
 
 ## Response
 
 - ### Response Attributes
 
   - **StatusCode** _int_
-      > ...
+      > status code that will be written in the response
 
   - **Body**   _*bytes.Buffer_
-      > ...
+      > response body.
+      >
+      > you can write directly or use some methods as you like
 
   - **Header** _[Header](#header)_
-      > ...
+      > header that will be written in the response
 
 - ### Response Methods
 
@@ -498,49 +588,49 @@
       > create a new Response with defaults settings
 
   - _(*Response)_ **BadRequest(** _body ...any_ **)**
-      > Send a BadRequest ( Status and Text )
+      > Sends a BadRequest ( Status and Text )
 
   - _(*Response)_ **Close( )**
       > Halts execution and closes the "response". This does not clear the response body
 
   - _(*Response)_ **Forbidden(** _body ...any_ **)**
-      > Send a StatusForbidden ( Status and Text )
+      > Sends a StatusForbidden (403) - Status and Text
 
   - _(*Response)_ **HTML(** _body string, code int_ **)**
-      > ...
+      > Sends an HTML document with its corresponding body data and status code
 
   - _(*Response)_ **ImATaerpot(** _body ...any_ **)**
-      > Send a StatusImATaerpot ( Status and Text )
+      > Sends a StatusImATaerpot (418) - Status and Text
 
   - _(*Response)_ **InternalServerError(** _body ...any_ **)**
-      > Send a StatusInternalServerError ( Status and Text )
+      > Sends a StatusInternalServerError (500) - Status and Text
 
   - _(*Response)_ **JSON(** _body any, code int_ **)**
-      > ...
+      > sends an JSON document with its corresponding body data and status code
 
   - _(*Response)_ **MethodNotAllowed(** _body ...any_ **)**
-      > Send a StatusMethodNotAllowed ( Status and Text )
+      > Sends a StatusMethodNotAllowed (405) - Status and Text
 
   - _(*Response)_ **NotFound(** _body ...any_ **)**
-      > Send a StatusNotFound ( Status and Text )
+      > Sends a StatusNotFound (404) - Status and Text
 
   - _(*Response)_ **Ok(** _body ...any_ **)**
-      > Send a StatusOk ( Status and Text )
+      > Sends a StatusOk (200) - Status and Text
 
   - _(*Response)_ **Redirect(** _url string_ **)**
-      > Redirect to Following URL
+      > Redirects to the following url
 
   - _(*Response)_ **RenderTemplate(** _pathToFile string, data ...any_ **)**
-      > Parse Html file and send to client
+      > Parse Html file and sends to client
 
   - _(*Response)_ **SetCookie(** _cookie http.Cookie_ **)**
       > Set a cookie in the Headers of Response
 
   - _(*Response)_ **TEXT(** _body string, code int_ **)**
-      > ...
+      > Sends an TEXT document with its corresponding body data and status code
 
   - _(*Response)_ **Unauthorized(** _body ...any_ **)**
-      > Send a Unauthorized ( Status and Text )
+      > Sends a Unauthorized (401) - Status and Text
 
 - ### Response Example
 
@@ -550,71 +640,95 @@
 
 - ### Route Attributes
 
-  - **Url** _string_
-      > ...
+  - **[Url](#url)** _string_
+
   - **Name** _string_
-      > ...
+
   - **Func** _[Func](#func)_
-      > ...
+
   - **MapCtrl** _[MapCtrl](#mapctrl)_
-      > ...
+
   - **Cors** *_[Cors](#cors)_
-      > ...
+
   - **Schema** _[Schema](#schema)_
-      > ...
+
   - **Methods** _[Methods](#methods)_
-      > ...
+
   - **Middlewares** _[Middlewares](#middlewares)_
-      > ...
 
 - ### Route Methods
 
-  - **ALL(** _url string, f [Func](#func)_ **) ->** _*Route_
-      > ...
+  - **ALL(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
+      > match with all http methods of request: (GET, POST, PUT, ....)
 
-  - **CONNECT(** _url string, f [Func](#func)_ **) ->** _*Route_
-      > ...
+  - **CONNECT(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
+      > return a route that matches the "CONNECT" method
 
-  - **DELETE(** _url string, f [Func](#func)_ **) ->** _*Route_
-      > ...
+  - **DELETE(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
+      > return a route that matches the "DELETE" method
 
-  - **GET(** _url string, f [Func](#func)_ **) ->** _*Route_
-      > ...
+  - **GET(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
+      > return a route that matches the "GET" method
 
-  - **HEAD(** _url string, f [Func](#func)_ **) ->** _*Route_
-      > ...
+  - **HEAD(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
+      > return a route that matches the "HEAD" method
 
-  - **OPTIONS(** _url string, f [Func](#func)_ **) ->** _*Route_
-      > ...
+  - **OPTIONS(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
+      > return a route that matches the "OPTIONS" method
 
-  - **PATCH(** _url string, f [Func](#func)_ **) ->** _*Route_
-      > ...
+  - **PATCH(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
+      > return a route that matches the "PATCH" method
 
-  - **POST(** _url string, f [Func](#func)_ **) ->** _*Route_
-      > ...
+  - **POST(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
+      > return a route that matches the "POST" method
 
-  - **PUT(** _url string, f [Func](#func)_ **) ->** _*Route_
-      > ...
+  - **PUT(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
+      > return a route that matches the "PUT" method
 
-  - **TRACE(** _url string, f [Func](#func)_ **) ->** _*Route_
-      > ...
+  - **TRACE(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
+      > return a route that matches the "TRACE" method
 
 - ### Route Example
 
-      ...
+    ```go
+        var routes := []*slow.Route{
+            slow.GET("/user/{userID:int}",anyFunc1),
+            slow.GET("/user/{userID:int}/profile",anyFunc2),
+            slow.GET("/user/{userID:int}/photos",otherFunc),
+            slow.POST("/user/{userID:int}/photos",otherFunc),
+        }
+        func main() {
+            ...
+            router.AddAll(routes)
+            app.Mount(router)
+            ...
+        }
+    ```
 
 ## Router
 
 - ### Router Attributes
 
   - **Name** _string_
-      > ...
+      > Router Name
 
   - **Prefix** _string_
-      > ...
+      > prefix of url route. example:
+      >
+      > route url -> "/user/photos"
+      >
+      > router prefix> "/api/v1"
+      >
+      > final url -> "/api/v1/user/photos"
 
   - **Subdomain** _string_
-      > ...
+      > router subdomain. example.
+      >
+      > subdomain -> "api"
+      >
+      > app.Servername -> "example.com"
+      >
+      > the app will listen on "api.example.com"
 
   - **Cors**        *[Cors](#cors)
       > ...
@@ -629,45 +743,93 @@
 
   - **NewRouter(** _name string_ **) ->** _*Router_
 
-  - _(r *Router)_ **Add(** _url, name string, f [Func](#func), meths []string_ **)**
-      > ...
+  - _(r *Router)_ **Add(** _[url](#url) string, name string, f [Func](#func), meths []string_ **)**
+      > example:
+
+      ```go
+      router := &slow.Router{}
+      router.Add("/", "index", func1, []string{"GET"})
+      ```
 
   - _(r *Router)_ **AddAll(** _routes ...*Route_ **)**
-      > ...
+      > example
 
-  - _(r *Router)_ **ALL(** _url string, f [Func](#func)_ **)**
-      > ...
+      ```go
+      var routes = []*slow.Route{}
 
-  - _(r *Router)_ **CONNECT(** _url string, f [Func](#func)_ **)**
-      > ...
+      var router = &slow.Router{}
+      router.AddAll(routes...)
+            
+      ```
 
-  - _(r *Router)_ **DELETE(** _url string, f [Func](#func)_ **)**
-      > ...
+  - _(r *Router)_ **ALL(** _[url](#url) string, f [Func](#func)_ **)**
+      > adds a new route that matches all http methods
 
-  - _(r *Router)_ **GET(** _url string, f [Func](#func)_ **)**
-      > ...
+  - _(r *Router)_ **CONNECT(** _[url](#url) string, f [Func](#func)_ **)**
+      > adds a new route that corresponds to the http "CONNECT" method
 
-  - _(r *Router)_ **HEAD(** _url string, f [Func](#func)_ **)**
-      > ...
+  - _(r *Router)_ **DELETE(** _[url](#url) string, f [Func](#func)_ **)**
+      > adds a new route that corresponds to the http "DELETE" method
 
-  - _(r *Router)_ **OPTIONS(** _url string, f [Func](#func)_ **)**
-      > ...
+  - _(r *Router)_ **GET(** _[url](#url) string, f [Func](#func)_ **)**
+      > adds a new route that corresponds to the http "GET" method
 
-  - _(r *Router)_ **PATCH(** _url string, f [Func](#func)_ **)**
-      > ...
+  - _(r *Router)_ **HEAD(** _[url](#url) string, f [Func](#func)_ **)**
+      > adds a new route that corresponds to the http "HEAD" method
 
-  - _(r *Router)_ **POST(** _url string, f [Func](#func)_ **)**
-      > ...
+  - _(r *Router)_ **OPTIONS(** _[url](#url) string, f [Func](#func)_ **)**
+      > adds a new route that corresponds to the http "OPTIONS" method
 
-  - _(r *Router)_ **PUT(** _url string, f [Func](#func)_ **)**
-      > ...
+  - _(r *Router)_ **PATCH(** _[url](#url) string, f [Func](#func)_ **)**
+      > adds a new route that corresponds to the http "PATCH" method
 
-  - _(r *Router)_ **TRACE(** _url string, f [Func](#func)_ **)**
-      > ...
+  - _(r *Router)_ **POST(** _[url](#url) string, f [Func](#func)_ **)**
+      > adds a new route that corresponds to the http "POST" method
+
+  - _(r *Router)_ **PUT(** _[url](#url) string, f [Func](#func)_ **)**
+      > adds a new route that corresponds to the http "PUT" method
+
+  - _(r *Router)_ **TRACE(** _[url](#url) string, f [Func](#func)_ **)**
+      > adds a new route that corresponds to the http "TRACE" method
 
 - ### Router Example
 
+    ```go
+    func main() {
+        router := slow.Router{
+            Name:"api",
+            Prefix:"/v1",
+            Subdomain:"api",
+            Cors: &slow.Cors{
+                AllowOrigin: "*",
+            },
+        }
+        router.GET("/user/{userID:int}",anyFunc1)
+        router.GET("/user/{userID:int}/profile",anyFunc2)
+        router.GET("/user/{userID:int}/photos",otherFunc)
+        router.POST("/user/{userID:int}/photos",otherFunc)
+
+        app.Mount(router)
         ...
+    }
+    ```
+
+## URL
+
+> _url_ : _string_
+
+- usage:
+
+  - literal path
+    >
+    > - "/foo", "/bar/", "/foo/bar", ...
+
+  - dynamic path
+    >
+    >- "/foo/{dynamic}" -> any string (simpleficado)
+    >- "/foo/{dynamic:str}" -> any string
+    >- "/foo/{dynamic:int}" -> only int (0-9+)
+    >- "/foo/{dynamic:path}" -> any path ("/path/to/filename")
 
 ## Schema
 
@@ -678,7 +840,7 @@
 - ### Session Attributes
 
   - **Permanent** *_bool_
-      > ...
+      > if true, session validity is one year, otherwise half hour if not specified
 
 - ### Session Methods
 
@@ -696,4 +858,13 @@
 
 - ### Session Example
 
+```go
+func login(ctx *slow.Ctx) {
+    ...
+    if user.Authenticate() {
+        ctx.Session.Set("user",user.ID)
         ...
+    }
+    ...
+}
+```
