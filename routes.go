@@ -23,7 +23,6 @@ type Route struct {
 	Name    string
 	Func    Func
 	MapCtrl MapCtrl
-	// Ctrl_ any  // struct{}.GET(ctx *Ctx)
 
 	Cors        *Cors
 	Schema      any
@@ -53,7 +52,7 @@ func (r *Route) compileUrl() {
 		if re.isVar.MatchString(str) {
 			str = re.str.ReplaceAllString(str, `(([\x00-\x7F]+)([^\\\/\s]+)|\d+)`)
 			str = re.digit.ReplaceAllString(str, `(\d+)`)
-			str = re.filepath.ReplaceAllString(str, `([\/\w+.-]+)`)
+			str = re.filepath.ReplaceAllString(str, `(.{0,})`)
 		}
 		r.urlRegex = append(r.urlRegex, regexp.MustCompile(fmt.Sprintf("^%s$", str)))
 	}
@@ -115,7 +114,6 @@ func (r *Route) parse() {
 	} else {
 		r.Cors = &Cors{AllowMethods: lmths}
 	}
-
 }
 
 func (r *Route) matchURL(ctx *Ctx, url string) bool {
@@ -127,6 +125,14 @@ func (r *Route) matchURL(ctx *Ctx, url string) bool {
 	lRegex := len(r.urlRegex)
 
 	if lSplit != lRegex {
+		_u := strings.TrimPrefix(r.Url, "/")
+		_u = strings.TrimSuffix(_u, "/")
+		u := strings.Split(_u, "/")
+		for _, p := range u {
+			if re.filepath.MatchString(p) {
+				return true
+			}
+		}
 		return false
 	}
 	for i, uRe := range r.urlRegex {
@@ -148,12 +154,7 @@ func (r *Route) match(ctx *Ctx) bool {
 	url := rq.URL.Path
 
 	if !r.matchURL(ctx, url) {
-		if !re.filepath.MatchString(r.fullUrl) {
-			return false
-		}
-		if !strings.HasPrefix(rq.URL.Path, ctx.App.StaticUrlPath) {
-			return false
-		}
+		return false
 	}
 
 	if meth, ok := r.MapCtrl[m]; ok {
@@ -170,19 +171,7 @@ func (r *Route) match(ctx *Ctx) bool {
 	return false
 }
 
-func ALL(url string, f Func) *Route {
-	return &Route{
-		Url:  url,
-		Func: f,
-		Name: getFunctionName(f),
-		Methods: []string{
-			"GET", "HEAD", "POST",
-			"PUT", "DELETE", "CONNECT",
-			"OPTIONS", "TRACE", "PATCH"},
-	}
-}
-
-func GET(url string, f Func) *Route {
+func Get(url string, f Func) *Route {
 	return &Route{
 		Url:     url,
 		Func:    f,
@@ -191,7 +180,7 @@ func GET(url string, f Func) *Route {
 	}
 }
 
-func HEAD(url string, f Func) *Route {
+func Head(url string, f Func) *Route {
 	return &Route{
 		Url:     url,
 		Func:    f,
@@ -200,7 +189,7 @@ func HEAD(url string, f Func) *Route {
 	}
 }
 
-func POST(url string, f Func) *Route {
+func Post(url string, f Func) *Route {
 	return &Route{
 		Url:     url,
 		Func:    f,
@@ -209,7 +198,7 @@ func POST(url string, f Func) *Route {
 	}
 }
 
-func PUT(url string, f Func) *Route {
+func Put(url string, f Func) *Route {
 	return &Route{
 		Url:     url,
 		Func:    f,
@@ -218,7 +207,7 @@ func PUT(url string, f Func) *Route {
 	}
 }
 
-func DELETE(url string, f Func) *Route {
+func Delete(url string, f Func) *Route {
 	return &Route{
 		Url:     url,
 		Func:    f,
@@ -227,7 +216,7 @@ func DELETE(url string, f Func) *Route {
 	}
 }
 
-func CONNECT(url string, f Func) *Route {
+func Connect(url string, f Func) *Route {
 	return &Route{
 		Url:     url,
 		Func:    f,
@@ -236,7 +225,7 @@ func CONNECT(url string, f Func) *Route {
 	}
 }
 
-func OPTIONS(url string, f Func) *Route {
+func Options(url string, f Func) *Route {
 	return &Route{
 		Url:     url,
 		Func:    f,
@@ -245,7 +234,7 @@ func OPTIONS(url string, f Func) *Route {
 	}
 }
 
-func TRACE(url string, f Func) *Route {
+func Trace(url string, f Func) *Route {
 	return &Route{
 		Url:     url,
 		Func:    f,
@@ -254,7 +243,7 @@ func TRACE(url string, f Func) *Route {
 	}
 }
 
-func PATCH(url string, f Func) *Route {
+func Patch(url string, f Func) *Route {
 	return &Route{
 		Url:     url,
 		Func:    f,

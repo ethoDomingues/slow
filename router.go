@@ -128,20 +128,7 @@ func (r *Router) Add(url, name string, f Func, meths []string) {
 		})
 }
 
-func (r *Router) ALL(url string, f Func) {
-	r.addRoute(&Route{
-		Url:  url,
-		Func: f,
-		Name: getFunctionName(f),
-		Methods: []string{
-			"GET", "HEAD", "POST",
-			"PUT", "DELETE", "CONNECT",
-			"OPTIONS", "TRACE", "PATCH",
-		},
-	})
-}
-
-func (r *Router) GET(url string, f Func) {
+func (r *Router) Get(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
@@ -150,7 +137,7 @@ func (r *Router) GET(url string, f Func) {
 	})
 }
 
-func (r *Router) HEAD(url string, f Func) {
+func (r *Router) Head(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
@@ -159,7 +146,7 @@ func (r *Router) HEAD(url string, f Func) {
 	})
 }
 
-func (r *Router) POST(url string, f Func) {
+func (r *Router) Post(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
@@ -168,7 +155,7 @@ func (r *Router) POST(url string, f Func) {
 	})
 }
 
-func (r *Router) PUT(url string, f Func) {
+func (r *Router) Put(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
@@ -177,7 +164,7 @@ func (r *Router) PUT(url string, f Func) {
 	})
 }
 
-func (r *Router) DELETE(url string, f Func) {
+func (r *Router) Delete(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
@@ -186,7 +173,7 @@ func (r *Router) DELETE(url string, f Func) {
 	})
 }
 
-func (r *Router) CONNECT(url string, f Func) {
+func (r *Router) Connect(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
@@ -195,7 +182,7 @@ func (r *Router) CONNECT(url string, f Func) {
 	})
 }
 
-func (r *Router) OPTIONS(url string, f Func) {
+func (r *Router) Options(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
@@ -204,7 +191,7 @@ func (r *Router) OPTIONS(url string, f Func) {
 	})
 }
 
-func (r *Router) TRACE(url string, f Func) {
+func (r *Router) Trace(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,
@@ -213,7 +200,7 @@ func (r *Router) TRACE(url string, f Func) {
 	})
 }
 
-func (r *Router) PATCH(url string, f Func) {
+func (r *Router) Patch(url string, f Func) {
 	r.addRoute(&Route{
 		Url:     url,
 		Func:    f,

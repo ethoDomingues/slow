@@ -77,10 +77,11 @@ func ValidJWT(jwt, secret string) (*JWT, bool) {
 
 func NewJWT(secret string) *JWT {
 	if secret == "" {
-		panic("for use JWT, SecretKey is required")
+		panic("for use JWT, a 'secret' is required")
 	}
 	return newJWT(secret)
 }
+
 func newJWT(secret string) *JWT {
 	return &JWT{
 		Payload: map[string]string{},

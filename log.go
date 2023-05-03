@@ -60,6 +60,13 @@ func (l *logger) Default(v ...any) {
 	}
 }
 
+func (l *logger) Defaultf(formatString string, v ...any) {
+	l.info.Printf(formatString, v...)
+	if l.logFile != nil {
+		l.logFile.Printf(formatString, v...)
+	}
+}
+
 func (l *logger) Error(v ...any) {
 	l.err.Println(v...)
 	if l.logFile != nil {
@@ -101,12 +108,15 @@ func (l *logger) LogRequest(ctx *Ctx) {
 		addr = rq.URL.Path
 	}
 
-	rd := rq.Header.Get("X-Real-Ip") // nginx cfg
-	if rd == "" {
-		rd = rq.RemoteAddr
-	}
-	if rd != "" {
-		rd = "[" + rd + "]"
+	rd := ""
+	if ctx.App.Env != "development" {
+		rq.Header.Get("X-Real-Ip") // nginx cfg
+		if rd == "" {
+			rd = rq.RemoteAddr
+		}
+		if rd != "" {
+			rd = "[" + rd + "]"
+		}
 	}
 	l.info.Printf("%s %s%d%s -> %s -> %s", rd, color, rsp.StatusCode, _RESET, rq.Method, addr)
 	if l.logFile != nil {

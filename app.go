@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,6 +22,7 @@ var (
 	listenInAll  bool
 	localAddress = getOutboundIP()
 	allowEnv     = map[string]string{
+		"test":        "test",
 		"dev":         "development",
 		"development": "development",
 		"prod":        "production",
@@ -87,7 +89,12 @@ func (app *App) build() {
 	}
 
 	if app.EnableStatic {
-		app.GET("/assets/{filepath:filepath}", serveFile)
+		staticUrl := "/assets"
+		fp := "/{filepath:path}"
+		if app.StaticUrlPath != "" {
+			staticUrl = app.StaticUrlPath
+		}
+		app.Get(filepath.Join(staticUrl, fp), serveFile)
 	}
 	// se o usuario mudar o router principal,
 	// isso evita alguns erro
@@ -121,7 +128,6 @@ func (app *App) build() {
 
 func (app *App) closeConn(ctx *Ctx) {
 	rsp := ctx.Response
-	rq := ctx.Request
 	err := recover()
 	defer l.LogRequest(ctx)
 	if err == ErrHttpAbort || err == nil {
@@ -132,10 +138,8 @@ func (app *App) closeConn(ctx *Ctx) {
 					ctx.Session.save(),
 				)
 			}
-			if rq.Method != "OPTIONS" {
-				rsp.parseHeaders()
-				rsp.Header.Save(rsp.raw)
-			}
+			rsp.parseHeaders()
+			rsp.Header.Save(rsp.raw)
 		} else {
 			if mi.MethodNotAllowed != nil {
 				rsp.StatusCode = 405
@@ -480,37 +484,32 @@ func (app *App) Build(addr ...string) {
 	app.built = true
 }
 
-// Build a app and starter Server
-func (app *App) Listen(host ...string) error {
-	app.Build(host...)
+func (app *App) parseListener() {
 	_, port, err := net.SplitHostPort(app.srv.Addr)
 	if err != nil {
 		l.err.Fatal(err)
 	}
 
 	if !app.Silent {
-		if listenInAll {
-			l.Default("Server is listening in all address")
-			l.info.Printf("          listening in: http://%s:%s", localAddress, port)
-			l.info.Printf("          listening in: http://127.0.0.1:%s", port)
+		env := allowEnv[strings.ToLower(app.Env)]
+		envDev := env == "" || env == "development"
+		if listenInAll || envDev {
+			if envDev {
+				l.Defaultf("Server is listening on all address in %sdevelopment mode%s", _RED, _RESET)
+			} else {
+				l.Default("Server is listening on all address")
+			}
+			l.info.Printf("          listening on: http://%s:%s", localAddress, port)
+			l.info.Printf("          listening on: http://127.0.0.1:%s", port)
 		} else {
 			l.Default("Server is linsten in", app.srv.Addr)
 		}
 	}
-	return app.srv.ListenAndServe()
 }
 
 // Build a app and starter Server
-func (app *App) ListenTLS(certFile string, keyFile string, host ...string) error {
+func (app *App) Listen(host ...string) error {
 	app.Build(host...)
-	port := strings.Split(app.srv.Addr, ":")[1]
-	if listenInAll {
-		l.Default("Server is listening in all address")
-		l.info.Printf("          listening in: https://%s:%s", localAddress, port)
-		l.info.Printf("          listening in: https://127.0.0.1:%s", port)
-	} else {
-		l.Default("Server is linsten in", app.srv.Addr)
-	}
-	l.Default("environment: ", app.Env)
-	return app.srv.ListenAndServeTLS(certFile, keyFile)
+	app.parseListener()
+	return app.srv.ListenAndServe()
 }

@@ -53,7 +53,6 @@ func getFreePort() (port string) {
 		_, port, _ = net.SplitHostPort(conn.LocalAddr().String())
 		break
 	}
-	fmt.Println(port)
 	return port
 }
 

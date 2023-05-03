@@ -78,7 +78,7 @@ type Request struct {
 	Form    map[string]any
 	Args    map[string]string
 	Mime    map[string]string
-	Query   map[string][]string
+	Query   url.Values
 	Files   map[string][]*File
 	Cookies map[string]*http.Cookie
 

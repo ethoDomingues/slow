@@ -61,9 +61,6 @@
   - **EnableStatic** _bool_
       > enable route of server file
 
-  - **ListeningInTLS** _bool_
-      > required of App.UrlFor() 'is automatic'
-
   - **BeforeRequest( )** [Func](#func)
       > is exec before each handler
       >
@@ -143,10 +140,10 @@
       ```go
         app.GET("/users/{userID:int}", index)
 
-        app.UrlFor("index", false, "userID", "1"})
+        app.UrlFor("index", false, "userID", "1")
         // results: /users/1
 
-        app.UrlFor("index", true, "userID", "1"})
+        app.UrlFor("index", true, "userID", "1")
         // results: http://yourAddress/users/1
       ```
 
@@ -658,44 +655,41 @@ func index(ctx *slow.Ctx) {
 
 - ### Route Methods
 
-  - **ALL(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
-      > match with all http methods of request: (GET, POST, PUT, ....)
-
-  - **CONNECT(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
+  - **Connect(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
       > return a route that matches the "CONNECT" method
 
-  - **DELETE(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
+  - **Delete(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
       > return a route that matches the "DELETE" method
 
-  - **GET(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
+  - **Get(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
       > return a route that matches the "GET" method
 
-  - **HEAD(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
+  - **Head(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
       > return a route that matches the "HEAD" method
 
-  - **OPTIONS(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
+  - **Options(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
       > return a route that matches the "OPTIONS" method
 
-  - **PATCH(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
+  - **Patch(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
       > return a route that matches the "PATCH" method
 
-  - **POST(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
+  - **Post(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
       > return a route that matches the "POST" method
 
-  - **PUT(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
+  - **Put(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
       > return a route that matches the "PUT" method
 
-  - **TRACE(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
+  - **Trace(** _[url](#url) string, f [Func](#func)_ **) ->** _*Route_
       > return a route that matches the "TRACE" method
 
 - ### Route Example
 
     ```go
         var routes := []*slow.Route{
-            slow.GET("/user/{userID:int}",anyFunc1),
-            slow.GET("/user/{userID:int}/profile",anyFunc2),
-            slow.GET("/user/{userID:int}/photos",otherFunc),
-            slow.POST("/user/{userID:int}/photos",otherFunc),
+            slow.Get("/user/{userID:int}",anyFunc1),
+            slow.Get("/user/{userID:int}/profile",anyFunc2),
+            slow.Get("/user/{userID:int}/photos",otherFunc),
+            slow.Post("/user/{userID:int}/photos",otherFunc),
         }
         func main() {
             ...
@@ -762,34 +756,31 @@ func index(ctx *slow.Ctx) {
             
       ```
 
-  - _(r *Router)_ **ALL(** _[url](#url) string, f [Func](#func)_ **)**
-      > adds a new route that matches all http methods
-
-  - _(r *Router)_ **CONNECT(** _[url](#url) string, f [Func](#func)_ **)**
+  - _(r *Router)_ **Connect(** _[url](#url) string, f [Func](#func)_ **)**
       > adds a new route that corresponds to the http "CONNECT" method
 
-  - _(r *Router)_ **DELETE(** _[url](#url) string, f [Func](#func)_ **)**
+  - _(r *Router)_ **Delete(** _[url](#url) string, f [Func](#func)_ **)**
       > adds a new route that corresponds to the http "DELETE" method
 
-  - _(r *Router)_ **GET(** _[url](#url) string, f [Func](#func)_ **)**
+  - _(r *Router)_ **Get(** _[url](#url) string, f [Func](#func)_ **)**
       > adds a new route that corresponds to the http "GET" method
 
-  - _(r *Router)_ **HEAD(** _[url](#url) string, f [Func](#func)_ **)**
+  - _(r *Router)_ **Head(** _[url](#url) string, f [Func](#func)_ **)**
       > adds a new route that corresponds to the http "HEAD" method
 
-  - _(r *Router)_ **OPTIONS(** _[url](#url) string, f [Func](#func)_ **)**
+  - _(r *Router)_ **Options(** _[url](#url) string, f [Func](#func)_ **)**
       > adds a new route that corresponds to the http "OPTIONS" method
 
-  - _(r *Router)_ **PATCH(** _[url](#url) string, f [Func](#func)_ **)**
+  - _(r *Router)_ **Patch(** _[url](#url) string, f [Func](#func)_ **)**
       > adds a new route that corresponds to the http "PATCH" method
 
-  - _(r *Router)_ **POST(** _[url](#url) string, f [Func](#func)_ **)**
+  - _(r *Router)_ **Post(** _[url](#url) string, f [Func](#func)_ **)**
       > adds a new route that corresponds to the http "POST" method
 
-  - _(r *Router)_ **PUT(** _[url](#url) string, f [Func](#func)_ **)**
+  - _(r *Router)_ **Put(** _[url](#url) string, f [Func](#func)_ **)**
       > adds a new route that corresponds to the http "PUT" method
 
-  - _(r *Router)_ **TRACE(** _[url](#url) string, f [Func](#func)_ **)**
+  - _(r *Router)_ **Trace(** _[url](#url) string, f [Func](#func)_ **)**
       > adds a new route that corresponds to the http "TRACE" method
 
 - ### Router Example
@@ -804,10 +795,11 @@ func index(ctx *slow.Ctx) {
                 AllowOrigin: "*",
             },
         }
-        router.GET("/user/{userID:int}",anyFunc1)
-        router.GET("/user/{userID:int}/profile",anyFunc2)
-        router.GET("/user/{userID:int}/photos",otherFunc)
-        router.POST("/user/{userID:int}/photos",otherFunc)
+        router.Get("/user/{userID:int}",anyFunc1)
+        router.Get("/user/{userID:int}/profile",otherFunc1)
+        router.Put("/user/{userID:int}/profile",otherFunc2)
+        router.Head("/user/{userID:int}/profile",anyFunc2)
+        router.Post("/user/{userID:int}/profile",otherFunc3)
 
         app.Mount(router)
         ...
@@ -826,7 +818,7 @@ func index(ctx *slow.Ctx) {
 
   - dynamic path
     >
-    >- "/foo/{dynamic}" -> any string (simpleficado)
+    >- "/foo/{dynamic}" -> any string
     >- "/foo/{dynamic:str}" -> any string
     >- "/foo/{dynamic:int}" -> only int (0-9+)
     >- "/foo/{dynamic:path}" -> any path ("/path/to/filename")
@@ -840,7 +832,7 @@ func index(ctx *slow.Ctx) {
 - ### Session Attributes
 
   - **Permanent** *_bool_
-      > if true, session validity is one year, otherwise half hour if not specified
+      > if true, session validity is one year, otherwise half hour
 
 - ### Session Methods
 

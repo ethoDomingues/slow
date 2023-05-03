@@ -5,10 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"io"
 	"net/http"
-	"os"
-	"path/filepath"
+	"path"
 )
 
 func NewResponse(wr http.ResponseWriter, ctx *Ctx) *Response {
@@ -139,25 +137,45 @@ func (r *Response) ImATaerpot(body ...any) { r.TEXT(fmt.Sprint(body...), 418) }
 // Send a StatusInternalServerError ( Status and Text )
 func (r *Response) InternalServerError(body ...any) { r.TEXT(fmt.Sprint(body...), 500) }
 
-// Parse Html file and send to client
-func (r *Response) RenderTemplate(pathToFile string, data ...any) {
-	ctx := r.ctx
-	fullPath := filepath.Join(GetFullPath(), ctx.App.TemplateFolder, pathToFile)
-
-	if f, err := os.Open(fullPath); err == nil {
-		defer f.Close()
-		buf := bytes.NewBuffer(nil)
-		io.Copy(buf, f)
-		t, err := template.New("").Parse(buf.String())
-		if err != nil {
-			l.err.Panic(err)
-		}
-		t.Execute(r.Body, data)
-		r.Close()
+func (r *Response) internal_ServerError(err ...any) {
+	if r.ctx.App.Env == "" || r.ctx.App.Env == "development" {
+		r.InternalServerError(err...)
 	} else {
-		l.err.Println(filepath.Join(ctx.App.TemplateFolder, pathToFile), " does not exist")
-		r.NotFound("Template Not Found")
+		r.InternalServerError()
 	}
+}
+
+// func unescape(s string) template.HTML {
+// 	return template.HTML(s)
+// }
+
+// Parse Html file and send to client
+func (r *Response) RenderTemplate(data any, pathToFile ...string) {
+
+	template_Folder := r.ctx.App.TemplateFolder
+	fullPath := path.Join(GetFullPath(), template_Folder)
+
+	paths := []string{}
+	for _, p := range pathToFile {
+		paths = append(paths, path.Join(fullPath, p))
+	}
+
+	t, err := template.ParseFiles(paths...)
+
+	if err != nil {
+		r.internal_ServerError(err)
+	}
+
+	err = t.Execute(r.Body, data)
+	if err != nil {
+		if r.ctx.App.Env == "" || r.ctx.App.Env == "development" {
+			r.InternalServerError(err)
+		} else {
+			r.InternalServerError()
+		}
+	}
+
+	r.Close()
 }
 
 // Abort the current request. Server does not respond to client
