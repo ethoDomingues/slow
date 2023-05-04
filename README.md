@@ -6,7 +6,7 @@
 
 ## Simple Example
 
-### [Com a correta configuração do go](https://go.dev/doc/install)
+### [With a correctly configured Go toolchain:](https://go.dev/doc/install)
 
 ```sh
 go get github.com/ethoDomingues/slow
