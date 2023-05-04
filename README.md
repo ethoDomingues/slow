@@ -41,6 +41,7 @@ func helloUser(ctx *slow.Ctx) {
  name := rq.Args["name"]
  rsp.HTML("Hello "+name, 200)
 }
+
 func userByID(ctx *slow.Ctx) {
  rq := ctx.Request   // current Request
  rsp := ctx.Response // current Response
