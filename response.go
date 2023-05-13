@@ -113,28 +113,24 @@ func (r *Response) HTML(body string, code int) {
 // This does not clear the response body
 func (r *Response) Close() { panic(ErrHttpAbort) }
 
-// Send a StatusOk ( Status and Text )
 func (r *Response) Ok(body ...any) { r.TEXT(fmt.Sprint(body...), 200) }
 
-// Send a BadRequest ( Status and Text )
+func (r *Response) Created(body ...any) { r.TEXT(fmt.Sprint(body...), 201) }
+
+func (r *Response) NoContent() { r.TEXT("", 204) }
+
 func (r *Response) BadRequest(body ...any) { r.TEXT(fmt.Sprint(body...), 400) }
 
-// Send a Unauthorized ( Status and Text )
 func (r *Response) Unauthorized(body ...any) { r.TEXT(fmt.Sprint(body...), 401) }
 
-// Send a StatusForbidden ( Status and Text )
 func (r *Response) Forbidden(body ...any) { r.TEXT(fmt.Sprint(body...), 403) }
 
-// Send a StatusNotFound ( Status and Text )
 func (r *Response) NotFound(body ...any) { r.TEXT(fmt.Sprint(body...), 404) }
 
-// Send a StatusMethodNotAllowed ( Status and Text )
 func (r *Response) MethodNotAllowed(body ...any) { r.TEXT(fmt.Sprint(body...), 405) }
 
-// Send a StatusImATaerpot ( Status and Text )
 func (r *Response) ImATaerpot(body ...any) { r.TEXT(fmt.Sprint(body...), 418) }
 
-// Send a StatusInternalServerError ( Status and Text )
 func (r *Response) InternalServerError(body ...any) { r.TEXT(fmt.Sprint(body...), 500) }
 
 func (r *Response) internal_ServerError(err ...any) {
@@ -145,11 +141,6 @@ func (r *Response) internal_ServerError(err ...any) {
 	}
 }
 
-// func unescape(s string) template.HTML {
-// 	return template.HTML(s)
-// }
-
-// Parse Html file and send to client
 func (r *Response) RenderTemplate(data any, pathToFile ...string) {
 
 	template_Folder := r.ctx.App.TemplateFolder
@@ -179,9 +170,7 @@ func (r *Response) RenderTemplate(data any, pathToFile ...string) {
 }
 
 // Abort the current request. Server does not respond to client
-func (r *Request) Cancel() {
-	r.Context().Done()
-}
+func (r *Request) Cancel() { r.Context().Done() }
 
-// Stops execution, cleans up the response body, and writes the StatusCode to the response
+// Break execution, cleans up the response body, and writes the StatusCode to the response
 func Abort(code int) { panic("abort:" + fmt.Sprint(code)) }

@@ -31,37 +31,28 @@ var (
 )
 
 // Returns a new app with a default settings
-func NewApp() *App {
-	router := NewRouter("main")
-	router.Name = ""
-	router.is_main = true
-
-	app := &App{
-		Router:         router,
-		routers:        []*Router{router},
-		routerByName:   map[string]*Router{"": router},
-		StaticFolder:   "./assets",
-		TemplateFolder: "./templates",
-		StaticUrlPath:  "/assets",
-		EnableStatic:   true,
+func NewApp(c *Config) *App {
+	router := &Router{
+		Name:         "",
+		Routes:       []*Route{},
+		routesByName: map[string]*Route{},
+		is_main:      true,
 	}
-	return app
+
+	nC := NewConfig()
+	nC.Update(c)
+
+	return &App{
+		Router:       router,
+		routers:      []*Router{router},
+		routerByName: map[string]*Router{"": router},
+		Config:       nC,
+	}
 }
 
 type App struct {
 	*Router
-
-	Env            string // environmnt
-	LogFile        string // save log info in file
-	SecretKey      string // for sign session
-	Servername     string // for build url routes and route match
-	StaticFolder   string // for serve static files
-	StaticUrlPath  string // url uf request static file
-	TemplateFolder string // for render template (html) files
-
-	Silent         bool // don't print logs
-	EnableStatic   bool // enable static endpoint for serving static files
-	ListeningInTLS bool // UrlFor return a URl with schema in "https:"
+	*Config
 
 	routers      []*Router
 	routerByName map[string]*Router
@@ -77,12 +68,12 @@ type App struct {
 // Parse the router and your routes
 func (app *App) build() {
 	if app.Servername != "" {
-		aaa := app.Servername
-		aaa = strings.TrimPrefix(aaa, ".")
-		aaa = strings.TrimSuffix(aaa, "/")
+		srv := app.Servername
+		srv = strings.TrimPrefix(srv, ".")
+		srv = strings.TrimSuffix(srv, "/")
 
-		servername = aaa
-		app.Servername = aaa
+		servername = srv
+		app.Servername = srv
 	}
 	if app.built {
 		return
@@ -94,7 +85,8 @@ func (app *App) build() {
 		if app.StaticUrlPath != "" {
 			staticUrl = app.StaticUrlPath
 		}
-		app.Get(filepath.Join(staticUrl, fp), serveFile)
+		path := filepath.Join(staticUrl, fp)
+		app.Get(path, serveFile)
 	}
 	// se o usuario mudar o router principal,
 	// isso evita alguns erro
@@ -116,6 +108,8 @@ func (app *App) build() {
 		}
 
 		app.is_main = true
+	} else {
+		l.Error("sign of App.Router is invalid")
 	}
 	for _, router := range app.routers {
 		router.parse()
@@ -450,6 +444,7 @@ example:
 	}
 */
 func (app *App) Build(addr ...string) {
+
 	var address string
 	if app.Env == "" {
 		app.Env = "development"
@@ -459,14 +454,11 @@ func (app *App) Build(addr ...string) {
 	l = newLogger(app.LogFile)
 
 	if len(addr) > 0 {
+		fmt.Println("def?")
 		address = addr[0]
 	} else if !flag.Parsed() {
 		flag.StringVar(&address, "address", "127.0.0.1:5000", "address of server listen. default: localhost")
 		flag.Parse()
-	} else {
-		l.warn.Println("you are using more than one application and you are trying to use the same address for both.")
-		p := getFreePort()
-		address = "127.0.0.1:" + p
 	}
 	app.build()
 
@@ -490,6 +482,8 @@ func (app *App) parseListener() {
 		l.err.Fatal(err)
 	}
 
+	localAddress := getOutboundIP()
+
 	if !app.Silent {
 		env := allowEnv[strings.ToLower(app.Env)]
 		envDev := env == "" || env == "development"
@@ -499,7 +493,7 @@ func (app *App) parseListener() {
 			} else {
 				l.Default("Server is listening on all address")
 			}
-			l.info.Printf("          listening on: http://%s:%s", localAddress, port)
+			l.info.Printf("          listening on: http://%s:%s", localAddress.IP, port)
 			l.info.Printf("          listening on: http://127.0.0.1:%s", port)
 		} else {
 			l.Default("Server is linsten in", app.srv.Addr)
@@ -511,5 +505,7 @@ func (app *App) parseListener() {
 func (app *App) Listen(host ...string) error {
 	app.Build(host...)
 	app.parseListener()
-	return app.srv.ListenAndServe()
+	err := app.srv.ListenAndServe()
+	l.Error(err)
+	return err
 }

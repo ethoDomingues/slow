@@ -9,7 +9,6 @@ import (
 	"reflect"
 	"runtime"
 	"strings"
-	"time"
 )
 
 var htmlReplacer = strings.NewReplacer(
@@ -32,28 +31,13 @@ func getFunctionName(i interface{}) string {
 }
 
 // Get preferred outbound ip of this machine
-func getOutboundIP() net.IP {
+func getOutboundIP() *net.UDPAddr {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer conn.Close()
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
-	return localAddr.IP
-}
-
-func getFreePort() (port string) {
-	for i := 1000; i < 64000; i++ {
-		addr := net.JoinHostPort("127.0.0.1", fmt.Sprint(i))
-		conn, err := net.DialTimeout("tcp", addr, time.Millisecond*200)
-		if err != nil {
-			continue
-		}
-		defer conn.Close()
-		_, port, _ = net.SplitHostPort(conn.LocalAddr().String())
-		break
-	}
-	return port
+	return conn.LocalAddr().(*net.UDPAddr)
 }
 
 func HtmlEscape(s string) string { return htmlReplacer.Replace(s) }

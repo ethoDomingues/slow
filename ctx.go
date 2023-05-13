@@ -1,5 +1,7 @@
 package slow
 
+import "github.com/ethodomingues/c3po"
+
 // Returns a new *Slow.Ctx
 func newCtx(app *App) *Ctx {
 	c := &Ctx{
@@ -27,6 +29,9 @@ type Ctx struct {
 	Response *Response
 
 	Session *Session
+
+	Schema        any
+	SchemaFielder *c3po.Fielder
 
 	// Contains information about the current request and the route
 	MatchInfo *MatchInfo

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+
+	"github.com/ethodomingues/c3po"
 )
 
 type Func func(*Ctx)
@@ -12,8 +14,8 @@ type Schema any
 
 type Meth struct {
 	Func
-	Method string
 	Schema
+	schemaFielder *c3po.Fielder
 }
 
 type MapCtrl map[string]*Meth
@@ -61,58 +63,51 @@ func (r *Route) compileUrl() {
 	}
 }
 
-func (r *Route) parse() {
-	if r.Func == nil && r.MapCtrl == nil {
-		l.err.Fatalf("Route '%s' need a func or Ctrl\n", r.fullName)
-	}
-	r.compileUrl()
-	ctrl := MapCtrl{
-		"OPTIONS": &Meth{
-			Method: "OPTIONS",
-		},
-	}
-	strMth := map[string]any{}
+func (r *Route) compileMethods() {
+	ctrl := MapCtrl{"OPTIONS": &Meth{}}
+
 	for verb, meth := range r.MapCtrl {
 		v := strings.ToUpper(verb)
 		if !reMethods.MatchString(v) {
 			l.err.Fatalf("route '%s' has invalid Request Method: '%s'", r.fullName, verb)
 		}
+		if meth.Schema != nil {
+			meth.schemaFielder = c3po.ParseSchemaWithTag("slow", meth.Schema)
+			meth.Schema = nil
+		}
 		ctrl[v] = meth
-		strMth[v] = nil
 	}
-	r.MapCtrl = ctrl
-
+	if r.MapCtrl == nil {
+		r.MapCtrl = MapCtrl{}
+	}
 	for _, verb := range r.Methods {
 		v := strings.ToUpper(verb)
 		if !reMethods.MatchString(v) {
 			l.err.Fatalf("route '%s' has invalid Request Method: '%s'", r.fullName, verb)
 		}
-		if _, ok := r.MapCtrl[v]; !ok {
+		if meth, ok := r.MapCtrl[v]; !ok {
 			r.MapCtrl[v] = &Meth{
 				Func:   r.Func,
 				Schema: r.Schema,
-				Method: v,
 			}
-		}
-		strMth[v] = nil
-	}
-	if _, ok := r.MapCtrl["HEAD"]; !ok {
-		if _, ok := r.MapCtrl["GET"]; ok {
-			r.MapCtrl["HEAD"] = r.MapCtrl["GET"]
-			strMth["HEAD"] = nil
+		} else if r.Schema != nil {
+			meth.schemaFielder = c3po.ParseSchemaWithTag("slow", r.Schema)
 		}
 	}
+	r.MapCtrl = ctrl
+}
 
-	lmths := []string{"OPTIONS"}
-	for v := range strMth {
-		lmths = append(lmths, v)
+func (r *Route) parse() {
+	if r.Func == nil && r.MapCtrl == nil {
+		l.err.Fatalf("Route '%s' need a func or Ctrl\n", r.fullName)
 	}
-	r.Methods = lmths
+	r.compileUrl()
+	r.compileMethods()
 
 	if r.Cors != nil {
-		r.Cors.AllowMethods = lmths
+		r.Cors.AllowMethods = r.Methods
 	} else {
-		r.Cors = &Cors{AllowMethods: lmths}
+		r.Cors = &Cors{AllowMethods: r.Methods}
 	}
 }
 
@@ -125,18 +120,13 @@ func (r *Route) matchURL(ctx *Ctx, url string) bool {
 	lRegex := len(r.urlRegex)
 
 	if lSplit != lRegex {
-		_u := strings.TrimPrefix(r.Url, "/")
-		_u = strings.TrimSuffix(_u, "/")
-		u := strings.Split(_u, "/")
-		for _, p := range u {
-			if re.filepath.MatchString(p) {
-				return true
-			}
+		if strings.HasPrefix(url, ctx.App.StaticUrlPath) {
+			return true
 		}
-		return false
 	}
+
 	for i, uRe := range r.urlRegex {
-		str := ""
+		var str string
 		if i < lSplit {
 			str = urlSplit[i]
 		}
@@ -156,7 +146,9 @@ func (r *Route) match(ctx *Ctx) bool {
 	if !r.matchURL(ctx, url) {
 		return false
 	}
-
+	if m == "HEAD" {
+		m = "GET"
+	}
 	if meth, ok := r.MapCtrl[m]; ok {
 		mi.MethodNotAllowed = nil
 		if meth.Func != nil {
@@ -164,10 +156,11 @@ func (r *Route) match(ctx *Ctx) bool {
 		}
 		mi.Match = true
 		mi.Route = r
+		mi.ctx.SchemaFielder = meth.schemaFielder
 		return true
 	}
-	mi.MethodNotAllowed = ErrorMethodMismatch
 	mi.Route = nil
+	mi.MethodNotAllowed = ErrorMethodMismatch
 	return false
 }
 

@@ -4,24 +4,26 @@
 
 > **Table Of Content**
 
-- [**App**](#app)
-- [**CORS**](#cors)
-- [**Ctx**](#ctx)
-- [**File**](#file)
-- [**Func**](#func)
-- [**Header**](#header)
-- [**JWT**](#jwt)
-- [**MapCtrl**](#mapctrl)
-- [**MatchInfo**](#matchinfo)
-- [**Meth**](#meth)
-- [**Methods**](#methods)
-- [**Middlewares**](#middlewares)
-- [**Request**](#request)
-- [**Response**](#response)
-- [**Route**](#route)
-- [**Router**](#router)
-- [**Schema**](#schema)
-- [**Session**](#session)
+- [Documentation](#documentation)
+  - [**_App_**](#app)
+  - [Cors](#cors)
+  - [Ctx](#ctx)
+  - [File](#file)
+  - [Func](#func)
+  - [Header](#header)
+  - [JWT](#jwt)
+  - [MapCtrl](#mapctrl)
+  - [MatchInfo](#matchinfo)
+  - [Meth](#meth)
+  - [Methods](#methods)
+  - [Middlewares](#middlewares)
+  - [Request](#request)
+  - [Response](#response)
+  - [Route](#route)
+  - [Router](#router)
+  - [URL](#url)
+  - [Schema](#schema)
+  - [Session](#session)
 
 ---
 
@@ -44,7 +46,7 @@
       > a secret of session cript
 
   - **Servername** _string_
-      > current hostname ( **example.com**,  **www.hostname.org**, etc... )
+      > current hostname ( **example.com**,  **<www.hostname.org>**, etc... )
 
   - **_StaticFolder_** _string_
       > path to assets folder of app.
@@ -686,10 +688,27 @@ func index(ctx *slow.Ctx) {
 
     ```go
         var routes := []*slow.Route{
-            slow.Get("/user/{userID:int}",anyFunc1),
-            slow.Get("/user/{userID:int}/profile",anyFunc2),
-            slow.Get("/user/{userID:int}/photos",otherFunc),
-            slow.Post("/user/{userID:int}/photos",otherFunc),
+            slow.Post("/users",postUsersFunc),
+            slow.Get("/users/{userID:int}",getUserFunc),
+            slow.Put("/users/{userID:int}",putUserFunc),
+            slow.Delete("/users/{userID:int}",delUserFunc),
+
+            slow.Post("/products",postProductsFunc),
+            {
+                Url:  "/products/{productsID:int}",
+                Name: "products",
+                MapCtrl: slow.MapCtrl{
+                    "GET": {
+                        Func: getProducts,
+                    },
+                    "POST": {
+                        Func: postProducts,
+                    },
+                    "PUT": {
+                        Func: putProducts,
+                    }
+                },
+            }
         }
         func main() {
             ...
@@ -825,7 +844,7 @@ func index(ctx *slow.Ctx) {
 
 ## Schema
 
-> any
+> any value of data validation frm request form
 
 ## Session
 

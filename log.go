@@ -72,7 +72,7 @@ func (l *logger) Error(v ...any) {
 	if l.logFile != nil {
 		l.logFile.Println(v...)
 	}
-	for i := 1; i < 15; i++ {
+	for i := 0; i < 20; i++ {
 		_, file, line, ok := runtime.Caller(i)
 		if !ok {
 			return

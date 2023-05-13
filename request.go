@@ -153,6 +153,16 @@ func (r *Request) parseRequest() {
 	r.parseHeaders()
 	r.parseCookies()
 	r.parseBody()
+	r.parseSchema()
+}
+
+func (r *Request) parseSchema() {
+	data, err := r.ctx.SchemaFielder.MountSchema(r.Form)
+	if err != nil {
+		r.ctx.Response.JSON(map[string]any{
+			"errors": err}, 400)
+	}
+	r.ctx.Schema = data.Interface()
 }
 
 // Returns the current url

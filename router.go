@@ -101,15 +101,15 @@ func (r *Router) addRoute(route *Route) {
 		r.Routes = []*Route{}
 		r.routesByName = map[string]*Route{}
 	}
-	if _, ok := r.routesByName[route.Name]; ok {
-		l.err.Panic(route.Name + " already registered!")
-	}
-	r.Routes = append(r.Routes, route)
+	routeName := route.Name
 	if r.Name != "" {
-		r.routesByName[r.Name+"."+route.Name] = route
-	} else {
-		r.routesByName[route.Name] = route
+		routeName = r.Name + "." + route.Name
 	}
+	if _, ok := r.routesByName[routeName]; ok {
+		l.err.Panic("route named '" + route.Name + "' already registered!")
+	}
+	r.routesByName[routeName] = route
+	r.Routes = append(r.Routes, route)
 }
 
 func (r *Router) AddAll(routes ...*Route) {
