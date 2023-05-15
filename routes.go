@@ -77,24 +77,26 @@ func (r *Route) compileMethods() {
 		}
 		ctrl[v] = meth
 	}
-	if r.MapCtrl == nil {
-		r.MapCtrl = MapCtrl{}
-	}
+
+	r.MapCtrl = ctrl
+
 	for _, verb := range r.Methods {
 		v := strings.ToUpper(verb)
 		if !reMethods.MatchString(v) {
 			l.err.Fatalf("route '%s' has invalid Request Method: '%s'", r.fullName, verb)
 		}
 		if meth, ok := r.MapCtrl[v]; !ok {
-			r.MapCtrl[v] = &Meth{
-				Func:   r.Func,
-				Schema: r.Schema,
+			r.MapCtrl[v] = &Meth{Func: r.Func}
+
+			if r.Schema != nil {
+				r.MapCtrl[v].schemaFielder = c3po.ParseSchemaWithTag("slow", r.Schema)
 			}
-		} else if r.Schema != nil {
-			meth.schemaFielder = c3po.ParseSchemaWithTag("slow", r.Schema)
+		} else {
+			if r.Schema != nil {
+				meth.schemaFielder = c3po.ParseSchemaWithTag("slow", r.Schema)
+			}
 		}
 	}
-	r.MapCtrl = ctrl
 }
 
 func (r *Route) parse() {
@@ -120,11 +122,13 @@ func (r *Route) matchURL(ctx *Ctx, url string) bool {
 	lRegex := len(r.urlRegex)
 
 	if lSplit != lRegex {
-		if strings.HasPrefix(url, ctx.App.StaticUrlPath) {
-			return true
+		if ctx.App.StaticUrlPath != "" {
+			if strings.HasPrefix(url, ctx.App.StaticUrlPath) {
+				return true
+			}
 		}
+		return false
 	}
-
 	for i, uRe := range r.urlRegex {
 		var str string
 		if i < lSplit {
@@ -134,6 +138,7 @@ func (r *Route) matchURL(ctx *Ctx, url string) bool {
 			return false
 		}
 	}
+
 	return true
 }
 
@@ -146,9 +151,11 @@ func (r *Route) match(ctx *Ctx) bool {
 	if !r.matchURL(ctx, url) {
 		return false
 	}
+
 	if m == "HEAD" {
 		m = "GET"
 	}
+
 	if meth, ok := r.MapCtrl[m]; ok {
 		mi.MethodNotAllowed = nil
 		if meth.Func != nil {
@@ -159,6 +166,7 @@ func (r *Route) match(ctx *Ctx) bool {
 		mi.ctx.SchemaFielder = meth.schemaFielder
 		return true
 	}
+
 	mi.Route = nil
 	mi.MethodNotAllowed = ErrorMethodMismatch
 	return false

@@ -39,14 +39,16 @@ func NewApp(c *Config) *App {
 		is_main:      true,
 	}
 
-	nC := NewConfig()
-	nC.Update(c)
+	cfg := NewConfig()
+	if c != nil {
+		cfg.Update(c)
+	}
 
 	return &App{
+		Config:       cfg,
 		Router:       router,
 		routers:      []*Router{router},
 		routerByName: map[string]*Router{"": router},
-		Config:       nC,
 	}
 }
 
@@ -91,11 +93,13 @@ func (app *App) build() {
 	// se o usuario mudar o router principal,
 	// isso evita alguns erro
 	if !app.is_main {
+		app.is_main = true
+
+		if app.Router.Routes == nil {
+			app.Router.Routes = []*Route{}
+		}
 		if app.Router.routesByName == nil {
 			app.Router.routesByName = map[string]*Route{}
-		}
-		if app.Router.Cors == nil {
-			app.Router.Cors = &Cors{}
 		}
 		if app.Router.Cors == nil {
 			app.Router.Cors = &Cors{}
@@ -103,13 +107,7 @@ func (app *App) build() {
 		if app.Router.Middlewares == nil {
 			app.Router.Middlewares = NewMiddleware(nil)
 		}
-		if app.Router.Routes == nil {
-			app.Router.Routes = []*Route{}
-		}
 
-		app.is_main = true
-	} else {
-		l.Error("sign of App.Router is invalid")
 	}
 	for _, router := range app.routers {
 		router.parse()

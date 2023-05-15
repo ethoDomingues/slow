@@ -94,6 +94,10 @@ func (r *Response) JSON(body any, code int) {
 func (r *Response) TEXT(body string, code int) {
 	r.Body.Reset()
 
+	if body == "" {
+		body = fmt.Sprintf("%d %s", code, http.StatusText(code))
+	}
+
 	r.StatusCode = code
 	r.Header.Set("Content-Type", "text/plain")
 	r.Body.WriteString(body)

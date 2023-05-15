@@ -66,6 +66,9 @@ func (c *Config) Fields() []string {
 
 func (c *Config) Update(cfg *Config) {
 	for _, v := range c.Fields() {
-		c.Set(v, cfg.getField(v).Interface())
+		f := cfg.getField(v)
+		if f.IsValid() {
+			c.Set(v, f.Interface())
+		}
 	}
 }

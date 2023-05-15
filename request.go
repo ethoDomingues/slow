@@ -153,7 +153,9 @@ func (r *Request) parseRequest() {
 	r.parseHeaders()
 	r.parseCookies()
 	r.parseBody()
-	r.parseSchema()
+	if r.ctx.SchemaFielder != nil {
+		r.parseSchema()
+	}
 }
 
 func (r *Request) parseSchema() {
