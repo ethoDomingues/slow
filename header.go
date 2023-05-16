@@ -29,10 +29,9 @@ func (h *Header) Del(key string) {
 
 // Set a Cookie. Has the same effect as 'Response.SetCookie'
 func (h *Header) SetCookie(cookie *http.Cookie) {
-	// http.Header(*h)
-	// if v := cookie.String(); v != "" {
-	// 	h.Add("Set-Cookie", v)
-	// }
+	if v := cookie.String(); v != "" {
+		h.Add("Set-Cookie", v)
+	}
 }
 
 // Write the headers in the response

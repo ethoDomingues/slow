@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/ethodomingues/c3po"
+	"github.com/ethoDomingues/c3po"
 )
 
 type Func func(*Ctx)

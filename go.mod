@@ -1,12 +1,11 @@
-module github.com/ethodomingues/slow
+module github.com/ethoDomingues/slow
 
 go 1.19
 
-require golang.org/x/exp v0.0.0-20221111204811-129d8d6c17ab
+replace github.com/ethoDomingues/c3po => ../c3po
 
 require (
-	github.com/ethodomingues/c3po v0.0.0-00010101000000-000000000000
+	github.com/ethoDomingues/c3po v0.0.0-00010101000000-000000000000
+	golang.org/x/exp v0.0.0-20230515195305-f3d0a9c9a5cc
 	gopkg.in/yaml.v2 v2.4.0
 )
-
-replace github.com/ethodomingues/c3po => ../c3po

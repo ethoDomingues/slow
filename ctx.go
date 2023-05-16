@@ -1,6 +1,6 @@
 package slow
 
-import "github.com/ethodomingues/c3po"
+import "github.com/ethoDomingues/c3po"
 
 // Returns a new *Slow.Ctx
 func newCtx(app *App) *Ctx {
