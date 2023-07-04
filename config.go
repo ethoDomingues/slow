@@ -1,27 +1,32 @@
 package slow
 
-import "reflect"
+import (
+	"reflect"
+	"time"
+)
 
 func NewConfig() *Config {
 	return &Config{
-		StaticFolder:   "./assets",
-		TemplateFolder: "./templates",
-		StaticUrlPath:  "/assets",
-		EnableStatic:   true,
+		StaticFolder:            "assets",
+		StaticUrlPath:           "/assets",
+		EnableStatic:            true,
+		SessionExpires:          time.Minute * 30,
+		SessionPermanentExpires: time.Hour * 744,
 	}
 }
 
 type Config struct {
-	Env            string // environmnt
-	LogFile        string // save log info in file
-	SecretKey      string // for sign session
-	Servername     string // for build url routes and route match
-	StaticFolder   string // for serve static files
-	StaticUrlPath  string // url uf request static file
-	TemplateFolder string // for render template (html) files
-	Silent         bool   // don't print logs
-	EnableStatic   bool   // enable static endpoint for serving static files
-	ListeningInTLS bool   // UrlFor return a URl with schema in "https:"
+	Env                     string // environmnt
+	LogFile                 string // save log info in file
+	SecretKey               string // for sign session
+	Servername              string // for build url routes and route match
+	StaticFolder            string // for serve static files
+	StaticUrlPath           string // url uf request static file
+	Silent                  bool   // don't print logs
+	EnableStatic            bool   // enable static endpoint for serving static files
+	ListeningInTLS          bool   // UrlFor return a URl with schema in "https:"
+	SessionExpires          time.Duration
+	SessionPermanentExpires time.Duration
 }
 
 func (c *Config) getField(name string) reflect.Value {
@@ -67,7 +72,7 @@ func (c *Config) Fields() []string {
 func (c *Config) Update(cfg *Config) {
 	for _, v := range c.Fields() {
 		f := cfg.getField(v)
-		if f.IsValid() {
+		if f.IsValid() || !f.IsZero() {
 			c.Set(v, f.Interface())
 		}
 	}

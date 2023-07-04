@@ -121,7 +121,10 @@ func (r *Request) parseBody() {
 	case r.ContentType == "", strings.HasPrefix(r.ContentType, "application/json"):
 		json.Unmarshal(body.Bytes(), &r.Form)
 	case strings.HasPrefix(r.ContentType, "application/xml"):
-		xml.Unmarshal(body.Bytes(), &r.Form)
+		e := xml.Unmarshal(body.Bytes(), &r.Form)
+		if e != nil {
+			ctx.Response.BadRequest(e)
+		}
 	case strings.HasPrefix(r.ContentType, "application/yaml"):
 		yaml.Unmarshal(body.Bytes(), &r.Form)
 	case strings.HasPrefix(r.ContentType, "multipart/"):

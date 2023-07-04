@@ -2,6 +2,7 @@ package slow
 
 import (
 	"fmt"
+	"path/filepath"
 	"regexp"
 	"strings"
 )
@@ -69,7 +70,7 @@ func (r *Router) parse() {
 		} else if route.Url != "" && (!strings.HasPrefix(route.Url, "/") && !strings.HasSuffix(r.Prefix, "/")) {
 			panic(fmt.Errorf("Route '%v' Prefix must start with slash or be a null String", r.Name))
 		}
-		route.fullUrl = r.Prefix + route.Url
+		route.fullUrl = filepath.Join(r.Prefix, route.Url)
 		if _, ok := r.routesByName[route.fullUrl]; ok {
 			panic(fmt.Errorf("Route with name '%s' already registered", r.Name))
 		}
@@ -82,6 +83,7 @@ func (r *Router) parse() {
 
 func (r *Router) match(ctx *Ctx) bool {
 	rq := ctx.Request
+
 	if r.subdomainRegex != nil {
 		if !r.subdomainRegex.MatchString(rq.URL.Host) {
 			return false
@@ -96,10 +98,13 @@ func (r *Router) match(ctx *Ctx) bool {
 	return false
 }
 
-func (r *Router) addRoute(route *Route) {
+func (r *Router) AddRoute(route *Route) {
 	if r.Routes == nil {
 		r.Routes = []*Route{}
 		r.routesByName = map[string]*Route{}
+	}
+	if route.Name == "" {
+		l.err.Panic("route need be named")
 	}
 	routeName := route.Name
 	if r.Name != "" {
@@ -114,12 +119,12 @@ func (r *Router) addRoute(route *Route) {
 
 func (r *Router) AddAll(routes ...*Route) {
 	for _, route := range routes {
-		r.addRoute(route)
+		r.AddRoute(route)
 	}
 }
 
 func (r *Router) Add(url, name string, f Func, meths []string) {
-	r.addRoute(
+	r.AddRoute(
 		&Route{
 			Name:    name,
 			Url:     url,
@@ -129,7 +134,7 @@ func (r *Router) Add(url, name string, f Func, meths []string) {
 }
 
 func (r *Router) Get(url string, f Func) {
-	r.addRoute(&Route{
+	r.AddRoute(&Route{
 		Url:     url,
 		Func:    f,
 		Name:    getFunctionName(f),
@@ -138,7 +143,7 @@ func (r *Router) Get(url string, f Func) {
 }
 
 func (r *Router) Head(url string, f Func) {
-	r.addRoute(&Route{
+	r.AddRoute(&Route{
 		Url:     url,
 		Func:    f,
 		Name:    getFunctionName(f),
@@ -147,7 +152,7 @@ func (r *Router) Head(url string, f Func) {
 }
 
 func (r *Router) Post(url string, f Func) {
-	r.addRoute(&Route{
+	r.AddRoute(&Route{
 		Url:     url,
 		Func:    f,
 		Name:    getFunctionName(f),
@@ -156,7 +161,7 @@ func (r *Router) Post(url string, f Func) {
 }
 
 func (r *Router) Put(url string, f Func) {
-	r.addRoute(&Route{
+	r.AddRoute(&Route{
 		Url:     url,
 		Func:    f,
 		Name:    getFunctionName(f),
@@ -165,7 +170,7 @@ func (r *Router) Put(url string, f Func) {
 }
 
 func (r *Router) Delete(url string, f Func) {
-	r.addRoute(&Route{
+	r.AddRoute(&Route{
 		Url:     url,
 		Func:    f,
 		Name:    getFunctionName(f),
@@ -174,7 +179,7 @@ func (r *Router) Delete(url string, f Func) {
 }
 
 func (r *Router) Connect(url string, f Func) {
-	r.addRoute(&Route{
+	r.AddRoute(&Route{
 		Url:     url,
 		Func:    f,
 		Name:    getFunctionName(f),
@@ -183,7 +188,7 @@ func (r *Router) Connect(url string, f Func) {
 }
 
 func (r *Router) Options(url string, f Func) {
-	r.addRoute(&Route{
+	r.AddRoute(&Route{
 		Url:     url,
 		Func:    f,
 		Name:    getFunctionName(f),
@@ -192,7 +197,7 @@ func (r *Router) Options(url string, f Func) {
 }
 
 func (r *Router) Trace(url string, f Func) {
-	r.addRoute(&Route{
+	r.AddRoute(&Route{
 		Url:     url,
 		Func:    f,
 		Name:    getFunctionName(f),
@@ -201,7 +206,7 @@ func (r *Router) Trace(url string, f Func) {
 }
 
 func (r *Router) Patch(url string, f Func) {
-	r.addRoute(&Route{
+	r.AddRoute(&Route{
 		Url:     url,
 		Func:    f,
 		Name:    getFunctionName(f),

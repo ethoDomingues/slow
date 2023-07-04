@@ -62,12 +62,9 @@ func ValidJWT(jwt, secret string) (*JWT, bool) {
 					}
 					if exp, ok := p["exp"]; ok {
 						t, err := time.Parse(time.RFC3339, exp)
-						if err == nil && time.Now().Before(t) {
-							return &JWT{Headers: h, Payload: p, Secret: secret}, true
-						}
-						return &JWT{Headers: h, Payload: p, Secret: secret}, false
+						return &JWT{h, p, secret}, (err == nil && time.Now().Before(t))
 					}
-					return &JWT{Headers: h, Payload: p, Secret: secret}, true
+					return &JWT{h, p, secret}, true
 				}
 			}
 		}

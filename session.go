@@ -110,3 +110,22 @@ func (s *Session) save() *http.Cookie {
 func (s *Session) GetSign() string {
 	return s.save().Value
 }
+
+func (s *Session) CheckUpdate(ctx *Ctx) {
+	update := false
+	if s.changed {
+		update = true
+	}
+	if !s.expires.IsZero() {
+		if s.expires.After(time.Now()) {
+			update = true
+		}
+	} else if !s.expiresPermanent.IsZero() {
+		if s.expires.Before(time.Now()) {
+			update = true
+		}
+	}
+	if update {
+
+	}
+}

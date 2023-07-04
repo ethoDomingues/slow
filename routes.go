@@ -9,6 +9,7 @@ import (
 )
 
 type Func func(*Ctx)
+
 type Methods []string
 type Schema any
 
@@ -31,34 +32,44 @@ type Route struct {
 	Methods     Methods
 	Middlewares Middlewares
 
-	fullName string
-	fullUrl  string
-	urlRegex []*regexp.Regexp
+	fullName  string
+	fullUrl   string
+	urlRegex  []*regexp.Regexp
+	_isStatic bool
 }
 
 func (r *Route) compileUrl() {
-	url := strings.TrimPrefix(r.fullUrl, "/")
-	url = strings.TrimSuffix(url, "/")
-	strs := strings.Split(url, "/")
+	url := r.fullUrl
+	addEnd := false
+	if url != "" && url != "/" {
+		url = strings.TrimPrefix(r.fullUrl, "/")
+		url = strings.TrimSuffix(url, "/")
+		strs := strings.Split(url, "/")
 
-	for _, str := range strs {
-		if str == "" {
-			continue
+		for _, str := range strs {
+			if str == "" {
+				continue
+			}
+			if re.dot2.MatchString(str) {
+				re.dot2.ReplaceAllString(str, "/")
+			}
+			if re.slash2.MatchString(str) {
+				re.slash2.ReplaceAllString(str, "/")
+			}
+			if re.isVar.MatchString(str) {
+				str = re.str.ReplaceAllString(str, `(([\x00-\x7F]+)([^\\\/\s]+)|\d+)`)
+				str = re.digit.ReplaceAllString(str, `(\d+)`)
+				str = re.filepath.ReplaceAllString(str, `(.{0,})`)
+			}
+			r.urlRegex = append(r.urlRegex, regexp.MustCompile(fmt.Sprintf("^%s$", str)))
 		}
-		if re.dot2.MatchString(str) {
-			re.dot2.ReplaceAllString(str, "/")
-		}
-		if re.slash2.MatchString(str) {
-			re.slash2.ReplaceAllString(str, "/")
-		}
-		if re.isVar.MatchString(str) {
-			str = re.str.ReplaceAllString(str, `(([\x00-\x7F]+)([^\\\/\s]+)|\d+)`)
-			str = re.digit.ReplaceAllString(str, `(\d+)`)
-			str = re.filepath.ReplaceAllString(str, `(.{0,})`)
-		}
-		r.urlRegex = append(r.urlRegex, regexp.MustCompile(fmt.Sprintf("^%s$", str)))
+	} else {
+		addEnd = true
 	}
 	if strings.HasSuffix(r.fullUrl, "/") {
+		addEnd = true
+	}
+	if addEnd {
 		r.urlRegex = append(r.urlRegex, regexp.MustCompile(`^(\/)?$`))
 	}
 }
@@ -74,6 +85,7 @@ func (r *Route) compileMethods() {
 		if meth.Schema != nil {
 			meth.schemaFielder = c3po.ParseSchemaWithTag("slow", meth.Schema)
 			meth.Schema = nil
+
 		}
 		ctrl[v] = meth
 	}
@@ -97,23 +109,44 @@ func (r *Route) compileMethods() {
 			}
 		}
 	}
+
+	r.Methods = []string{}
+	for verb := range r.MapCtrl {
+		r.Methods = append(r.Methods, verb)
+		if verb == "GET" {
+			r.Methods = append(r.Methods, "HEAD")
+		}
+	}
+
+	if len(r.Methods) <= 1 {
+		r.Methods = []string{"GET", "HEAD"}
+		r.MapCtrl["GET"] = &Meth{
+			Func: r.Func,
+		}
+	}
 }
 
 func (r *Route) parse() {
 	if r.Func == nil && r.MapCtrl == nil {
-		l.err.Fatalf("Route '%s' need a func or Ctrl\n", r.fullName)
+		l.err.Fatalf("Route '%s' need a Func, WsFunc or Ctrl\n", r.fullName)
 	}
+
 	r.compileUrl()
 	r.compileMethods()
 
 	if r.Cors != nil {
-		r.Cors.AllowMethods = r.Methods
+		r.Cors.AllowMethods = strings.Join(r.Methods, ", ")
 	} else {
-		r.Cors = &Cors{AllowMethods: r.Methods}
+		r.Cors = &Cors{AllowMethods: strings.Join(r.Methods, ", ")}
 	}
 }
 
 func (r *Route) matchURL(ctx *Ctx, url string) bool {
+	// if url == /  and route.Url == /
+	if url == "/" && url == r.fullUrl {
+		return true
+	}
+
 	nurl := strings.TrimPrefix(url, "/")
 	nurl = strings.TrimSuffix(nurl, "/")
 	urlSplit := strings.Split(nurl, "/")
@@ -122,13 +155,14 @@ func (r *Route) matchURL(ctx *Ctx, url string) bool {
 	lRegex := len(r.urlRegex)
 
 	if lSplit != lRegex {
-		if ctx.App.StaticUrlPath != "" {
-			if strings.HasPrefix(url, ctx.App.StaticUrlPath) {
+		if ctx.App.EnableStatic && r._isStatic {
+			if strings.HasPrefix(ctx.Request.URL.Path, ctx.App.StaticUrlPath) {
 				return true
 			}
 		}
 		return false
 	}
+
 	for i, uRe := range r.urlRegex {
 		var str string
 		if i < lSplit {
@@ -151,7 +185,6 @@ func (r *Route) match(ctx *Ctx) bool {
 	if !r.matchURL(ctx, url) {
 		return false
 	}
-
 	if m == "HEAD" {
 		m = "GET"
 	}
@@ -163,7 +196,7 @@ func (r *Route) match(ctx *Ctx) bool {
 		}
 		mi.Match = true
 		mi.Route = r
-		mi.ctx.SchemaFielder = meth.schemaFielder
+		ctx.SchemaFielder = meth.schemaFielder
 		return true
 	}
 

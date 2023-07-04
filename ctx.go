@@ -5,7 +5,7 @@ import "github.com/ethoDomingues/c3po"
 // Returns a new *Slow.Ctx
 func newCtx(app *App) *Ctx {
 	c := &Ctx{
-		App:       app,
+		App:       app.clone(),
 		Global:    map[string]any{},
 		MatchInfo: &MatchInfo{},
 	}
@@ -17,7 +17,7 @@ func newCtx(app *App) *Ctx {
 
 type Ctx struct {
 
-	// Current App
+	// Clone Current App
 	App *App
 
 	Global map[string]any
@@ -28,12 +28,15 @@ type Ctx struct {
 	// Current Response
 	Response *Response
 
+	// Current Cookie Session
 	Session *Session
 
-	Schema        any
+	// New Schema valid from route schema
+	Schema any
+
 	SchemaFielder *c3po.Fielder
 
-	// Contains information about the current request and the route
+	// Contains information about the current request, route, etc...
 	MatchInfo *MatchInfo
 }
 

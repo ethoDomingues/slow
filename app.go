@@ -55,16 +55,16 @@ func NewApp(c *Config) *App {
 type App struct {
 	*Router
 	*Config
-
-	routers      []*Router
-	routerByName map[string]*Router
-
+	// TODO -> add testConfig, ProdConfig
 	BeforeRequest, // exec before each request
 	AfterRequest, // exec after each request (if the application dont crash)
 	TearDownRequest Func // exec after each request, after send to cleint ( this dont has effect in response)
 
-	built bool
+	routers      []*Router
+	routerByName map[string]*Router
+
 	srv   *http.Server
+	built bool
 }
 
 // Parse the router and your routes
@@ -88,7 +88,12 @@ func (app *App) build() {
 			staticUrl = app.StaticUrlPath
 		}
 		path := filepath.Join(staticUrl, fp)
-		app.Get(path, serveFile)
+		app.AddRoute(&Route{
+			Url:       path,
+			Func:      HandlerServeFile,
+			Name:      "assets",
+			_isStatic: true,
+		})
 	}
 	// se o usuario mudar o router principal,
 	// isso evita alguns erro
@@ -116,6 +121,7 @@ func (app *App) build() {
 		}
 	}
 	app.routerByName[app.Router.Name] = app.Router
+	app.built = true
 }
 
 func (app *App) closeConn(ctx *Ctx) {
@@ -126,23 +132,21 @@ func (app *App) closeConn(ctx *Ctx) {
 		mi := ctx.MatchInfo
 		if mi.Match {
 			if ctx.Session.changed {
-				rsp.SetCookie(
-					ctx.Session.save(),
-				)
+				rsp.SetCookie(ctx.Session.save())
 			}
 			rsp.parseHeaders()
 			rsp.Header.Save(rsp.raw)
 		} else {
 			if mi.MethodNotAllowed != nil {
 				rsp.StatusCode = 405
-				rsp.Body.WriteString("405 Method Not Allowed")
+				rsp.WriteString("405 Method Not Allowed")
 			} else {
 				rsp.StatusCode = 404
-				rsp.Body.WriteString("404 Not Found")
+				rsp.WriteString("404 Not Found")
 			}
 		}
 		rsp.raw.WriteHeader(rsp.StatusCode)
-		fmt.Fprint(rsp.raw, rsp.Body.String())
+		fmt.Fprint(rsp.raw, rsp.String())
 	} else {
 		rsp.StatusCode = 200
 		statusText := ""
@@ -166,7 +170,7 @@ func (app *App) closeConn(ctx *Ctx) {
 	}
 
 	if app.TearDownRequest != nil {
-		app.TearDownRequest(ctx)
+		go app.TearDownRequest(ctx)
 	}
 }
 
@@ -186,6 +190,7 @@ func (app *App) execRoute(ctx *Ctx) {
 			mid(ctx)
 		}
 		ctx.MatchInfo.Func(ctx)
+
 		if app.AfterRequest != nil {
 			app.AfterRequest(ctx)
 		}
@@ -203,31 +208,41 @@ func (app *App) listRoutes() {
 	for _, r := range app.routesByName {
 		listRouteName = append(listRouteName, r.fullName)
 		if nl := len(r.fullName); nl > nameLen {
-			nameLen = nl + 1
+			nameLen = nl
 		}
-		if ml := len(strings.Join(r.Methods, " ")); ml > methLen {
-			methLen = ml + 1
+		if ml := len(strings.Join(r.Methods, ",")); ml > methLen {
+			methLen = ml
 		}
 		if pl := len(r.fullUrl); pl > pathLen {
-			pathLen = pl + 1
+			pathLen = pl
 		}
 	}
 	sort.Strings(listRouteName)
 
-	line1 := strings.Repeat("-", nameLen)
-	line2 := strings.Repeat("-", methLen)
-	line3 := strings.Repeat("-", pathLen)
+	if nameLen-6 < 0 {
+		nameLen = 6
+	}
+	if methLen-7 < 0 {
+		methLen = 7
+	}
+	if pathLen-9 < 0 {
+		pathLen = 9
+	}
 
-	routeN := "ROUTES" + strings.Repeat(" ", nameLen-6)
-	methodsN := "METHODS" + strings.Repeat(" ", methLen-7)
-	endpointN := "ENDPOINTS" + strings.Repeat(" ", pathLen-9)
+	line1 := strings.Repeat("-", nameLen+1)
+	line2 := strings.Repeat("-", methLen+1)
+	line3 := strings.Repeat("-", pathLen+1)
 
-	fmt.Printf("+-%s-+-%s-+-%s-+\n", line1, line2, line3)
-	fmt.Printf("| %s | %s | %s |\n", routeN, methodsN, endpointN)
-	fmt.Printf("+-%s-+-%s-+-%s-+\n", line1, line2, line3)
+	routeN := "ROUTES " + strings.Repeat(" ", nameLen-6)
+	methodsN := "METHODS " + strings.Repeat(" ", methLen-7)
+	endpointN := "ENDPOINTS " + strings.Repeat(" ", pathLen-9)
+
+	fmt.Printf("+-%s+-%s+-%s+\n", line1, line2, line3)
+	fmt.Printf("| %s| %s| %s|\n", routeN, methodsN, endpointN)
+	fmt.Printf("+-%s+-%s+-%s+\n", line1, line2, line3)
 	for _, rName := range listRouteName {
 		r := app.routesByName[rName]
-		mths_ := strings.Join(r.Methods, " ")
+		mths_ := strings.Join(r.Methods, ",")
 		space1 := nameLen - len(rName)
 		space2 := methLen - len(mths_)
 		space3 := pathLen - len(r.fullUrl)
@@ -237,7 +252,7 @@ func (app *App) listRoutes() {
 		path := r.fullUrl + strings.Repeat(" ", space3)
 		fmt.Printf("| %s | %s | %s |\n", endpoint, mths, path)
 	}
-	fmt.Printf("+-%s-+-%s-+-%s-+\n", line1, line2, line3)
+	fmt.Printf("+-%s+-%s+-%s+\n", line1, line2, line3)
 }
 
 func (app *App) match(ctx *Ctx) bool {
@@ -280,8 +295,6 @@ func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
 	if app.match(ctx) {
 		rq.parseRequest()
 		app.execRoute(ctx)
-	} else if app.TearDownRequest != nil {
-		app.TearDownRequest(ctx)
 	}
 }
 
@@ -376,7 +389,7 @@ func (app *App) UrlFor(name string, external bool, args ...string) string {
 		} else {
 			if servername == "" {
 				_, p, _ := net.SplitHostPort(app.srv.Addr)
-				h := net.JoinHostPort(localAddress.String(), p)
+				h := net.JoinHostPort(localAddress, p)
 				host = schema + h
 			} else {
 				host = schema + servername
@@ -480,21 +493,26 @@ func (app *App) parseListener() {
 		l.err.Fatal(err)
 	}
 
-	localAddress := getOutboundIP()
-
 	if !app.Silent {
 		env := allowEnv[strings.ToLower(app.Env)]
 		envDev := env == "" || env == "development"
+		if localAddress == "" {
+			localAddress = getOutboundIP()
+		}
+		localAddress = fmt.Sprintf("%s:%s", localAddress, port)
+
 		if listenInAll || envDev {
 			if envDev {
 				l.Defaultf("Server is listening on all address in %sdevelopment mode%s", _RED, _RESET)
 			} else {
 				l.Default("Server is listening on all address")
 			}
-			l.info.Printf("          listening on: http://%s:%s", localAddress.IP, port)
-			l.info.Printf("          listening on: http://127.0.0.1:%s", port)
+			l.info.Printf("          listening on: http://%s", localAddress)
+			l.info.Printf("          listening on: http://0.0.0.0:%s", port)
+			app.srv.Addr = fmt.Sprintf("%s:%s", "0.0.0.0", port)
 		} else {
 			l.Default("Server is linsten in", app.srv.Addr)
+			app.srv.Addr = localAddress
 		}
 	}
 }
@@ -506,4 +524,28 @@ func (app *App) Listen(host ...string) error {
 	err := app.srv.ListenAndServe()
 	l.Error(err)
 	return err
+}
+
+func (app *App) clone() *App {
+	var cfg Config
+	var srv *http.Server
+	var router Router
+	var routers []*Router
+
+	srv = app.srv
+	cfg = *app.Config
+	router = *app.Router
+
+	routers = app.routers
+	nApp := &App{
+		srv:             srv,
+		built:           true,
+		Config:          &cfg,
+		Router:          &router,
+		routers:         routers,
+		AfterRequest:    app.AfterRequest,
+		BeforeRequest:   app.BeforeRequest,
+		TearDownRequest: app.TearDownRequest,
+	}
+	return nApp
 }

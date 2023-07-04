@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-func serveFile(ctx *Ctx) {
+func HandlerServeFile(ctx *Ctx) {
 	rsp := ctx.Response
 	rq := ctx.Request
 
@@ -20,9 +20,7 @@ func serveFile(ctx *Ctx) {
 	}
 
 	pathToFile := strings.TrimPrefix(uri, static)
-	p := GetFullPath()
-	pathToFile = filepath.Join(p, ctx.App.StaticFolder, pathToFile)
-
+	pathToFile = filepath.Join(ctx.App.StaticFolder, pathToFile)
 	if f, err := os.Open(pathToFile); err == nil {
 
 		_, file := filepath.Split(pathToFile)
@@ -30,12 +28,12 @@ func serveFile(ctx *Ctx) {
 		if fStat, err := f.Stat(); err != nil || fStat.IsDir() {
 			rsp.NotFound()
 		}
-		io.Copy(rsp.Body, f)
+		io.Copy(rsp, f)
 
 		ctype := mime.TypeByExtension(filepath.Ext(file))
 
 		if ctype == "application/octet-stream" {
-			ctype = http.DetectContentType(rsp.Body.Bytes())
+			ctype = http.DetectContentType(rsp.Bytes())
 		}
 
 		rsp.Header.Set("Content-Type", ctype)
@@ -47,12 +45,36 @@ func serveFile(ctx *Ctx) {
 	}
 }
 
+func ServeFile(ctx *Ctx, pathToFile ...string) {
+	rsp := ctx.Response
+	path := filepath.Join(pathToFile...)
+
+	if f, err := os.Open(path); err == nil {
+		_, file := filepath.Split(path)
+		defer f.Close()
+		if fStat, err := f.Stat(); err != nil || fStat.IsDir() {
+			rsp.NotFound()
+		}
+		io.Copy(rsp, f)
+		ctype := mime.TypeByExtension(filepath.Ext(file))
+		if ctype == "application/octet-stream" {
+			ctype = http.DetectContentType(rsp.Bytes())
+		}
+		rsp.Header.Set("Content-Type", ctype)
+		rsp.Close()
+	} else if ctx.App.Env != "prod" {
+		rsp.checkErrByEnv(err)
+	} else {
+		rsp.NotFound()
+	}
+}
+
 func optionsHandler(ctx *Ctx) {
 	rsp := ctx.Response
 	mi := ctx.MatchInfo
 
 	rsp.StatusCode = 200
-	strMeths := strings.Join(mi.Route.Cors.AllowMethods, ", ")
+	strMeths := mi.Route.Cors.AllowMethods
 	if rsp.Header.Get("Access-Control-Allow-Methods") == "" {
 		rsp.Header.Set("Access-Control-Allow-Methods", strMeths)
 	}

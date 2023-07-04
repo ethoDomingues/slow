@@ -2,7 +2,6 @@ package slow
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -31,13 +30,13 @@ func getFunctionName(i interface{}) string {
 }
 
 // Get preferred outbound ip of this machine
-func getOutboundIP() *net.UDPAddr {
+func getOutboundIP() string {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
-		log.Fatal(err)
+		return "0.0.0.0"
 	}
 	defer conn.Close()
-	return conn.LocalAddr().(*net.UDPAddr)
+	return conn.LocalAddr().(*net.UDPAddr).IP.String()
 }
 
 func HtmlEscape(s string) string { return htmlReplacer.Replace(s) }
