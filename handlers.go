@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-func HandlerServeFile(ctx *Ctx) {
+func handlerServeFile(ctx *Ctx) {
 	rsp := ctx.Response
 	rq := ctx.Request
 
@@ -18,7 +18,6 @@ func HandlerServeFile(ctx *Ctx) {
 	if ctx.App.Prefix != "" {
 		static = filepath.Join(ctx.App.Prefix, static)
 	}
-
 	pathToFile := strings.TrimPrefix(uri, static)
 	pathToFile = filepath.Join(ctx.App.StaticFolder, pathToFile)
 	if f, err := os.Open(pathToFile); err == nil {

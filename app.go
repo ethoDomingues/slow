@@ -90,7 +90,7 @@ func (app *App) build() {
 		path := filepath.Join(staticUrl, fp)
 		app.AddRoute(&Route{
 			Url:       path,
-			Func:      HandlerServeFile,
+			Func:      handlerServeFile,
 			Name:      "assets",
 			_isStatic: true,
 		})
