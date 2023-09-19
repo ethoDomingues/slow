@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+
+	"github.com/ethoDomingues/c3po"
 )
 
 func NewResponse(wr http.ResponseWriter, ctx *Ctx) *Response {
@@ -27,6 +29,10 @@ type Response struct {
 
 	ctx *Ctx
 	raw http.ResponseWriter
+}
+
+func (r *Response) RawResponse() http.ResponseWriter {
+	return r.raw
 }
 
 func (r *Response) _write(v any) {
@@ -82,17 +88,18 @@ func (r *Response) Redirect(url string) {
 	r.StatusCode = 302
 
 	r.Header.Set("Content-Type", "text/html; charset=utf-8")
-	r.WriteString("<a href=\"" + HtmlEscape(url) + "\"> Manual Redirect </a>.\n")
+	r.WriteString("<a href=\"" + c3po.HtmlEscape(url) + "\"> Manual Redirect </a>.\n")
 	panic(ErrHttpAbort)
 }
 
 func (r *Response) JSON(body any, code int) {
 	r.Reset()
 
-	j, err := json.Marshal(body)
+	j, err := json.MarshalIndent(body, "", "  ")
 	if err != nil {
 		panic(err)
 	}
+
 	r.StatusCode = code
 	r.Header.Set("Content-Type", "application/json")
 	r.Write(j)
@@ -111,8 +118,6 @@ func (r *Response) textCode(body any, code int) {
 	r.StatusCode = code
 	if body == nil {
 		body = fmt.Sprintf("%d %s", code, http.StatusText(code))
-	} else {
-		body = http.StatusText(code)
 	}
 	fmt.Fprint(r, body)
 	panic(ErrHttpAbort)
@@ -130,32 +135,19 @@ func (r *Response) HTML(body any, code int) {
 // This does not clear the response body
 func (r *Response) Close() { panic(ErrHttpAbort) }
 
-func (r *Response) Ok(body ...any) { r.textCode(fmt.Sprint(body...), 200) }
-
-func (r *Response) Created(body ...any) { r.textCode(fmt.Sprint(body...), 201) }
-
-func (r *Response) NoContent() { r.textCode("", 204) }
-
-func (r *Response) BadRequest(body ...any) { r.textCode(fmt.Sprint(body...), 400) }
-
-func (r *Response) Unauthorized(body ...any) { r.textCode(fmt.Sprint(body...), 401) }
-
-func (r *Response) Forbidden(body ...any) { r.textCode(fmt.Sprint(body...), 403) }
-
-func (r *Response) NotFound(body ...any) { r.textCode(fmt.Sprint(body...), 404) }
-
-func (r *Response) MethodNotAllowed(body ...any) { r.textCode(fmt.Sprint(body...), 405) }
-
-func (r *Response) ImATaerpot(body ...any) { r.textCode(fmt.Sprint(body...), 418) }
-
-func (r *Response) InternalServerError(body ...any) { r.textCode(fmt.Sprint(body...), 500) }
+func (r *Response) Ok()                  { r.textCode(nil, 200) }
+func (r *Response) Created()             { r.textCode(nil, 201) }
+func (r *Response) NoContent()           { r.textCode(nil, 204) }
+func (r *Response) BadRequest()          { r.textCode(nil, 400) }
+func (r *Response) Unauthorized()        { r.textCode(nil, 401) }
+func (r *Response) Forbidden()           { r.textCode(nil, 403) }
+func (r *Response) NotFound()            { r.textCode(nil, 404) }
+func (r *Response) MethodNotAllowed()    { r.textCode(nil, 405) }
+func (r *Response) ImATaerpot()          { r.textCode(nil, 418) }
+func (r *Response) InternalServerError() { r.textCode(nil, 500) }
 
 func (r *Response) checkErrByEnv(err ...any) {
-	if r.ctx.App.Env == "" || r.ctx.App.Env == "development" {
-		r.InternalServerError(err...)
-	} else {
-		r.InternalServerError()
-	}
+	r.InternalServerError()
 }
 
 // Abort the current request. Server does not respond to client

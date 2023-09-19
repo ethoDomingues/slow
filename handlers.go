@@ -37,11 +37,10 @@ func handlerServeFile(ctx *Ctx) {
 
 		rsp.Header.Set("Content-Type", ctype)
 		rsp.Close()
-	} else if ctx.App.Env != "prod" {
-		rsp.NotFound(err)
 	} else {
-		rsp.NotFound()
+		rsp.TEXT(err, 404)
 	}
+
 }
 
 func ServeFile(ctx *Ctx, pathToFile ...string) {

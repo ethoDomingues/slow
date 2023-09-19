@@ -2,7 +2,6 @@ package slow
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"net"
 	"net/http"
@@ -16,18 +15,16 @@ import (
 )
 
 var (
-	l = newLogger("")
-
-	servername   string
-	listenInAll  bool
-	localAddress = getOutboundIP()
-	allowEnv     = map[string]string{
+	allowEnv = map[string]string{
 		"test":        "test",
 		"dev":         "development",
 		"development": "development",
 		"prod":        "production",
 		"production":  "production",
 	}
+	l            = newLogger("")
+	listenInAll  bool
+	localAddress = getOutboundIP()
 )
 
 // Returns a new app with a default settings
@@ -56,8 +53,8 @@ type App struct {
 	*Router
 	*Config
 	// TODO -> add testConfig, ProdConfig
-	BeforeRequest, // exec before each request
 	AfterRequest, // exec after each request (if the application dont crash)
+	BeforeRequest, // exec before each request
 	TearDownRequest Func // exec after each request, after send to cleint ( this dont has effect in response)
 
 	routers      []*Router
@@ -73,8 +70,6 @@ func (app *App) build() {
 		srv := app.Servername
 		srv = strings.TrimPrefix(srv, ".")
 		srv = strings.TrimSuffix(srv, "/")
-
-		servername = srv
 		app.Servername = srv
 	}
 	if app.built {
@@ -110,12 +105,12 @@ func (app *App) build() {
 			app.Router.Cors = &Cors{}
 		}
 		if app.Router.Middlewares == nil {
-			app.Router.Middlewares = NewMiddleware(nil)
+			app.Router.Middlewares = []Func{}
 		}
 
 	}
 	for _, router := range app.routers {
-		router.parse()
+		router.parse(app.Servername)
 		if router != app.Router {
 			maps.Copy(app.routesByName, router.routesByName)
 		}
@@ -128,9 +123,14 @@ func (app *App) closeConn(ctx *Ctx) {
 	rsp := ctx.Response
 	err := recover()
 	defer l.LogRequest(ctx)
+	defer execTeardown(ctx)
+
 	if err == ErrHttpAbort || err == nil {
 		mi := ctx.MatchInfo
 		if mi.Match {
+			if ctx.Request.isWebsocket {
+				return
+			}
 			if ctx.Session.changed {
 				rsp.SetCookie(ctx.Session.save())
 			}
@@ -148,17 +148,19 @@ func (app *App) closeConn(ctx *Ctx) {
 		rsp.raw.WriteHeader(rsp.StatusCode)
 		fmt.Fprint(rsp.raw, rsp.String())
 	} else {
-		rsp.StatusCode = 200
 		statusText := ""
 		errStr, ok := err.(string)
 		if ok && strings.HasPrefix(errStr, "abort:") {
+			if ctx.App.AfterRequest != nil {
+				ctx.App.AfterRequest(ctx)
+			}
 			strCode := strings.TrimPrefix(errStr, "abort:")
 			code, err := strconv.Atoi(strCode)
 			if err != nil {
 				panic(err)
 			}
 			rsp.StatusCode = code
-			statusText = strCode + " " + http.StatusText(code)
+			statusText = rsp.String()
 
 		} else {
 			rsp.StatusCode = 500
@@ -168,41 +170,42 @@ func (app *App) closeConn(ctx *Ctx) {
 		rsp.raw.WriteHeader(rsp.StatusCode)
 		fmt.Fprint(rsp.raw, statusText)
 	}
+}
 
-	if app.TearDownRequest != nil {
-		go app.TearDownRequest(ctx)
+func execTeardown(ctx *Ctx) {
+	if ctx.App.TearDownRequest != nil {
+		go ctx.App.TearDownRequest(ctx)
 	}
 }
 
 // exec route and handle errors of application
 func (app *App) execRoute(ctx *Ctx) {
 	rq := ctx.Request
-	if ctx.MatchInfo.Func == nil && rq.Method == "OPTIONS" {
+	mi := ctx.MatchInfo
+
+	if mi.Func == nil && rq.Method == "OPTIONS" {
 		optionsHandler(ctx)
 	} else {
+		rq.parse()
 		if app.BeforeRequest != nil {
 			app.BeforeRequest(ctx)
 		}
-		for _, mid := range ctx.MatchInfo.Router.Middlewares {
-			mid(ctx)
-		}
-		for _, mid := range ctx.MatchInfo.Route.Middlewares {
-			mid(ctx)
-		}
-		ctx.MatchInfo.Func(ctx)
 
-		if app.AfterRequest != nil {
-			app.AfterRequest(ctx)
-		}
+		ctx.mids = append(ctx.mids, mi.Router.Middlewares...)
+		ctx.mids = append(ctx.mids, mi.Route.Middlewares...)
+		ctx.mids = append(ctx.mids, mi.Func)
+
+		ctx.Next()
 	}
 }
 
 // Show All Routes ( internal )
 func (app *App) listRoutes() {
-	app.build()
+	app.Build()
 	nameLen := 0
 	methLen := 0
 	pathLen := 0
+	subDoLen := 0
 
 	listRouteName := []string{}
 	for _, r := range app.routesByName {
@@ -216,51 +219,87 @@ func (app *App) listRoutes() {
 		if pl := len(r.fullUrl); pl > pathLen {
 			pathLen = pl
 		}
+		if sName := strings.Split(r.fullName, "."); len(sName) == 2 {
+			router := app.routerByName[sName[0]]
+			if router != nil && router.Subdomain != "" {
+				if l := len(router.Subdomain); l > subDoLen {
+					subDoLen = l
+				}
+			}
+		}
 	}
 	sort.Strings(listRouteName)
 
-	if nameLen-6 < 0 {
+	if nameLen < 6 {
 		nameLen = 6
 	}
-	if methLen-7 < 0 {
+	if methLen < 7 {
 		methLen = 7
 	}
-	if pathLen-9 < 0 {
+	if pathLen < 9 {
 		pathLen = 9
+	}
+	if subDoLen < 10 && subDoLen != 0 {
+		subDoLen = 10
 	}
 
 	line1 := strings.Repeat("-", nameLen+1)
 	line2 := strings.Repeat("-", methLen+1)
 	line3 := strings.Repeat("-", pathLen+1)
+	line4 := strings.Repeat("-", subDoLen+1)
 
 	routeN := "ROUTES " + strings.Repeat(" ", nameLen-6)
 	methodsN := "METHODS " + strings.Repeat(" ", methLen-7)
 	endpointN := "ENDPOINTS " + strings.Repeat(" ", pathLen-9)
 
-	fmt.Printf("+-%s+-%s+-%s+\n", line1, line2, line3)
-	fmt.Printf("| %s| %s| %s|\n", routeN, methodsN, endpointN)
-	fmt.Printf("+-%s+-%s+-%s+\n", line1, line2, line3)
-	for _, rName := range listRouteName {
-		r := app.routesByName[rName]
-		mths_ := strings.Join(r.Methods, ",")
-		space1 := nameLen - len(rName)
-		space2 := methLen - len(mths_)
-		space3 := pathLen - len(r.fullUrl)
+	if subDoLen > 0 {
+		subdomainN := "SUBDOMAINS " + strings.Repeat(" ", subDoLen-10)
 
-		endpoint := r.fullName + strings.Repeat(" ", space1)
-		mths := mths_ + strings.Repeat(" ", space2)
-		path := r.fullUrl + strings.Repeat(" ", space3)
-		fmt.Printf("| %s | %s | %s |\n", endpoint, mths, path)
+		fmt.Printf("+-%s+-%s+-%s+-%s+\n", line1, line2, line3, line4)
+		fmt.Printf("| %s| %s| %s| %s|\n", routeN, methodsN, endpointN, subdomainN)
+		fmt.Printf("+-%s+-%s+-%s+-%s+\n", line1, line2, line3, line4)
+		for _, rName := range listRouteName {
+			r := app.routesByName[rName]
+			mths_ := strings.Join(r.Methods, ",")
+			space1 := nameLen - len(rName)
+			space2 := methLen - len(mths_)
+			space3 := pathLen - len(r.fullUrl)
+			space4 := subDoLen - len(r.GetRouter().Subdomain)
+
+			endpoint := r.fullName + strings.Repeat(" ", space1)
+			mths := mths_ + strings.Repeat(" ", space2)
+			path := r.fullUrl + strings.Repeat(" ", space3)
+			sub := r.GetRouter().Subdomain + strings.Repeat(" ", space4)
+			fmt.Printf("| %s | %s | %s | %s |\n", endpoint, mths, path, sub)
+		}
+		fmt.Printf("+-%s+-%s+-%s+-%s+\n", line1, line2, line3, line4)
+	} else {
+		fmt.Printf("+-%s+-%s+-%s+\n", line1, line2, line3)
+		fmt.Printf("| %s| %s| %s|\n", routeN, methodsN, endpointN)
+		fmt.Printf("+-%s+-%s+-%s+\n", line1, line2, line3)
+		for _, rName := range listRouteName {
+			r := app.routesByName[rName]
+			mths_ := strings.Join(r.Methods, ",")
+			space1 := nameLen - len(rName)
+			space2 := methLen - len(mths_)
+			space3 := pathLen - len(r.fullUrl)
+
+			endpoint := r.fullName + strings.Repeat(" ", space1)
+			mths := mths_ + strings.Repeat(" ", space2)
+			path := r.fullUrl + strings.Repeat(" ", space3)
+			fmt.Printf("| %s | %s | %s |\n", endpoint, mths, path)
+		}
+		fmt.Printf("+-%s+-%s+-%s+\n", line1, line2, line3)
 	}
-	fmt.Printf("+-%s+-%s+-%s+\n", line1, line2, line3)
 }
 
 func (app *App) match(ctx *Ctx) bool {
 	rq := ctx.Request
 
-	if servername != "" {
+	if app.Servername != "" {
 		rqUrl := rq.URL.Host
-		if !strings.Contains(rqUrl, servername) {
+		if !strings.Contains(rqUrl, app.Servername) {
+			fmt.Println(rqUrl, app.Servername)
 			return false
 		}
 		if net.ParseIP(rqUrl) != nil {
@@ -278,22 +317,18 @@ func (app *App) match(ctx *Ctx) bool {
 
 // http.Handler func
 func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
-	ctx := newCtx(app)
-	rsp := NewResponse(wr, ctx)
-	rq := NewRequest(req, ctx)
 
-	ctx.Request = rq
-	ctx.Response = rsp
+	ctx := newCtx(app)
+	ctx.Request = NewRequest(req, ctx)
+	ctx.Response = NewResponse(wr, ctx)
 
 	defer app.closeConn(ctx)
-	if app.SecretKey != "" {
-		if c, ok := rq.Cookies["session"]; ok {
-			ctx.Session.validate(c, app.SecretKey)
-		}
+
+	if c, ok := ctx.Request.Cookies["_session"]; ok {
+		ctx.Session.validate(c, app.SecretKey)
 	}
 
 	if app.match(ctx) {
-		rq.parseRequest()
 		app.execRoute(ctx)
 	}
 }
@@ -324,6 +359,7 @@ func (app *App) Mount(routers ...*Router) {
 		} else if _, ok := app.routerByName[router.Name]; ok {
 			panic(fmt.Errorf("router '%s' already regitered", router.Name))
 		}
+		router.parse(app.Servername)
 		app.routerByName[router.Name] = router
 		app.routers = append(app.routers, router)
 	}
@@ -385,14 +421,14 @@ func (app *App) UrlFor(name string, external bool, args ...string) string {
 			schema = "https://"
 		}
 		if router.Subdomain != "" {
-			host = schema + router.Subdomain + "." + servername
+			host = schema + router.Subdomain + "." + app.Servername
 		} else {
-			if servername == "" {
+			if app.Servername == "" {
 				_, p, _ := net.SplitHostPort(app.srv.Addr)
 				h := net.JoinHostPort(localAddress, p)
 				host = schema + h
 			} else {
-				host = schema + servername
+				host = schema + app.Servername
 			}
 		}
 	}
@@ -465,12 +501,18 @@ func (app *App) Build(addr ...string) {
 	l = newLogger(app.LogFile)
 
 	if len(addr) > 0 {
-		fmt.Println("def?")
-		address = addr[0]
-	} else if !flag.Parsed() {
-		flag.StringVar(&address, "address", "127.0.0.1:5000", "address of server listen. default: localhost")
-		flag.Parse()
+		a_ := addr[0]
+		if a_ != "" {
+			_, _, err := net.SplitHostPort(a_)
+			if err == nil {
+				address = a_
+			}
+		}
 	}
+	if address == "" {
+		address = "127.0.0.1:5000"
+	}
+
 	app.build()
 
 	if strings.Contains(address, "0.0.0.0") {
@@ -484,68 +526,38 @@ func (app *App) Build(addr ...string) {
 		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
+
 	app.built = true
 }
 
-func (app *App) parseListener() {
-	_, port, err := net.SplitHostPort(app.srv.Addr)
+func (app *App) logStarterListener() {
+	addr, port, err := net.SplitHostPort(app.srv.Addr)
 	if err != nil {
-		l.err.Fatal(err)
+		l.err.Panic(err)
 	}
-
-	if !app.Silent {
-		env := allowEnv[strings.ToLower(app.Env)]
-		envDev := env == "" || env == "development"
-		if localAddress == "" {
-			localAddress = getOutboundIP()
-		}
-		localAddress = fmt.Sprintf("%s:%s", localAddress, port)
-
-		if listenInAll || envDev {
-			if envDev {
-				l.Defaultf("Server is listening on all address in %sdevelopment mode%s", _RED, _RESET)
-			} else {
-				l.Default("Server is listening on all address")
-			}
-			l.info.Printf("          listening on: http://%s", localAddress)
-			l.info.Printf("          listening on: http://0.0.0.0:%s", port)
-			app.srv.Addr = fmt.Sprintf("%s:%s", "0.0.0.0", port)
+	envDev := app.Env == "development"
+	if listenInAll {
+		app.srv.Addr = localAddress
+		if envDev {
+			l.Defaultf("Server is listening on all address in %sdevelopment mode%s", _RED, _RESET)
 		} else {
-			l.Default("Server is linsten in", app.srv.Addr)
-			app.srv.Addr = localAddress
+			l.Default("Server is listening on all address")
 		}
+		l.info.Printf("          listening on: http://%s:%s", getOutboundIP(), port)
+		l.info.Printf("          listening on: http://0.0.0.0:%s", port)
+	} else {
+		if envDev {
+			l.Defaultf("Server is listening in %sdevelopment mode%s", _RED, _RESET)
+		} else {
+			l.Default("Server is linsten")
+		}
+		l.info.Printf("          listening on: http://%s:%s", addr, port)
 	}
 }
 
 // Build a app and starter Server
-func (app *App) Listen(host ...string) error {
+func (app *App) Listen(host ...string) {
 	app.Build(host...)
-	app.parseListener()
-	err := app.srv.ListenAndServe()
-	l.Error(err)
-	return err
-}
-
-func (app *App) clone() *App {
-	var cfg Config
-	var srv *http.Server
-	var router Router
-	var routers []*Router
-
-	srv = app.srv
-	cfg = *app.Config
-	router = *app.Router
-
-	routers = app.routers
-	nApp := &App{
-		srv:             srv,
-		built:           true,
-		Config:          &cfg,
-		Router:          &router,
-		routers:         routers,
-		AfterRequest:    app.AfterRequest,
-		BeforeRequest:   app.BeforeRequest,
-		TearDownRequest: app.TearDownRequest,
-	}
-	return nApp
+	app.logStarterListener()
+	app.srv.ListenAndServe()
 }

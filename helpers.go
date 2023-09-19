@@ -10,16 +10,6 @@ import (
 	"strings"
 )
 
-var htmlReplacer = strings.NewReplacer(
-	"&", "&amp;",
-	"<", "&lt;",
-	">", "&gt;",
-	// "&#34;" is shorter than "&quot;".
-	`"`, "&#34;",
-	// "&#39;" is shorter than "&apos;" and apos was not in HTML until HTML5.
-	"'", "&#39;",
-)
-
 func getFunctionName(i interface{}) string {
 	splitName := strings.Split(
 		runtime.FuncForPC(
@@ -38,8 +28,6 @@ func getOutboundIP() string {
 	defer conn.Close()
 	return conn.LocalAddr().(*net.UDPAddr).IP.String()
 }
-
-func HtmlEscape(s string) string { return htmlReplacer.Replace(s) }
 
 // Alias of 'fmt.Sprintf("%T", obj)'
 func TypeOf(obj any) string { return fmt.Sprintf("%T", obj) }

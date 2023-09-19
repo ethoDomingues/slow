@@ -10,7 +10,6 @@ import (
 
 type Func func(*Ctx)
 
-type Methods []string
 type Schema any
 
 type Meth struct {
@@ -22,19 +21,23 @@ type Meth struct {
 type MapCtrl map[string]*Meth
 
 type Route struct {
-	Url     string
-	Name    string
+	Url  string
+	Name string
+
 	Func    Func
-	MapCtrl MapCtrl
+	Methods []string
 
 	Cors        *Cors
 	Schema      any
-	Methods     Methods
+	MapCtrl     MapCtrl
 	Middlewares Middlewares
 
-	fullName  string
-	fullUrl   string
-	urlRegex  []*regexp.Regexp
+	router   *Router
+	fullUrl  string
+	fullName string
+	urlRegex []*regexp.Regexp
+
+	parsed,
 	_isStatic bool
 }
 
@@ -77,13 +80,19 @@ func (r *Route) compileUrl() {
 func (r *Route) compileMethods() {
 	ctrl := MapCtrl{"OPTIONS": &Meth{}}
 
+	// alow Route{URL:"/",Name:"index",Func:func()} with method default "GET"
+	if len(r.MapCtrl) == 0 && len(r.Methods) == 0 {
+		r.Methods = []string{"GET"}
+	}
+
 	for verb, meth := range r.MapCtrl {
 		v := strings.ToUpper(verb)
 		if !reMethods.MatchString(v) {
 			l.err.Fatalf("route '%s' has invalid Request Method: '%s'", r.fullName, verb)
 		}
 		if meth.Schema != nil {
-			meth.schemaFielder = c3po.ParseSchemaWithTag("slow", meth.Schema)
+			sch := c3po.ParseSchemaWithTag("slow", meth.Schema)
+			meth.schemaFielder = sch
 			meth.Schema = nil
 
 		}
@@ -97,15 +106,15 @@ func (r *Route) compileMethods() {
 		if !reMethods.MatchString(v) {
 			l.err.Fatalf("route '%s' has invalid Request Method: '%s'", r.fullName, verb)
 		}
-		if meth, ok := r.MapCtrl[v]; !ok {
-			r.MapCtrl[v] = &Meth{Func: r.Func}
+
+		if _, ok := r.MapCtrl[v]; !ok {
+			r.MapCtrl[v] = &Meth{
+				Func: r.Func,
+			}
 
 			if r.Schema != nil {
-				r.MapCtrl[v].schemaFielder = c3po.ParseSchemaWithTag("slow", r.Schema)
-			}
-		} else {
-			if r.Schema != nil {
-				meth.schemaFielder = c3po.ParseSchemaWithTag("slow", r.Schema)
+				sch := c3po.ParseSchemaWithTag("slow", r.Schema)
+				r.MapCtrl[v].schemaFielder = sch
 			}
 		}
 	}
@@ -114,7 +123,9 @@ func (r *Route) compileMethods() {
 	for verb := range r.MapCtrl {
 		r.Methods = append(r.Methods, verb)
 		if verb == "GET" {
-			r.Methods = append(r.Methods, "HEAD")
+			if _, ok := r.MapCtrl["HEAD"]; !ok {
+				r.Methods = append(r.Methods, "HEAD")
+			}
 		}
 	}
 
@@ -128,7 +139,7 @@ func (r *Route) compileMethods() {
 
 func (r *Route) parse() {
 	if r.Func == nil && r.MapCtrl == nil {
-		l.err.Fatalf("Route '%s' need a Func, WsFunc or Ctrl\n", r.fullName)
+		l.err.Fatalf("Route '%s' need a Func or Ctrl\n", r.fullName)
 	}
 
 	r.compileUrl()
@@ -204,6 +215,18 @@ func (r *Route) match(ctx *Ctx) bool {
 	mi.MethodNotAllowed = ErrorMethodMismatch
 	return false
 }
+
+func (r *Route) GetRouter() *Router {
+	if r.router == nil {
+		l.err.Panicf("unregistered route: '%s'", r.Name)
+	}
+	return r.router
+}
+
+/*
+
+
+ */
 
 func Get(url string, f Func) *Route {
 	return &Route{

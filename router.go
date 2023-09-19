@@ -27,13 +27,17 @@ type Router struct {
 
 	Cors        *Cors
 	Routes      []*Route
-	Middlewares Middlewares
+	Middlewares []Func
 
 	routesByName   map[string]*Route
 	subdomainRegex *regexp.Regexp
 }
 
-func (r *Router) parse() {
+func (r *Router) parse(servername string) {
+	if r.routesByName == nil {
+		r.routesByName = map[string]*Route{}
+	}
+
 	if r.Name == "" && !r.is_main {
 		panic(fmt.Errorf("the routers must be named"))
 	}
@@ -60,25 +64,39 @@ func (r *Router) parse() {
 	}
 
 	for _, route := range r.Routes {
-		if r.Name != "" {
-			route.fullName = r.Name + "." + route.Name
-		} else {
-			route.fullName = route.Name
+		if !route.parsed {
+			r.parseRoute(route)
 		}
-		if r.Prefix != "" && !strings.HasPrefix(r.Prefix, "/") {
-			panic(fmt.Errorf("Router '%v' Prefix must start with slash or be a null string ", r.Name))
-		} else if route.Url != "" && (!strings.HasPrefix(route.Url, "/") && !strings.HasSuffix(r.Prefix, "/")) {
-			panic(fmt.Errorf("Route '%v' Prefix must start with slash or be a null String", r.Name))
-		}
-		route.fullUrl = filepath.Join(r.Prefix, route.Url)
-		if _, ok := r.routesByName[route.fullUrl]; ok {
-			panic(fmt.Errorf("Route with name '%s' already registered", r.Name))
-		}
-		re.slash2.ReplaceAllString(route.fullName, "/")
-
-		route.parse()
-		r.routesByName[route.fullName] = route
 	}
+}
+
+func (r *Router) parseRoute(route *Route) {
+	if route.Name == "" {
+		if route.Func == nil {
+			l.err.Panic("route need be named")
+		}
+		route.Name = getFunctionName(route.Func)
+	}
+	if r.Name != "" {
+		route.fullName = r.Name + "." + route.Name
+	} else {
+		route.fullName = route.Name
+	}
+	if r.Prefix != "" && !strings.HasPrefix(r.Prefix, "/") {
+		panic(fmt.Errorf("Router '%v' Prefix must start with slash or be a null string ", r.Name))
+	} else if route.Url != "" && (!strings.HasPrefix(route.Url, "/") && !strings.HasSuffix(r.Prefix, "/")) {
+		panic(fmt.Errorf("Route '%v' Prefix must start with slash or be a null String", r.Name))
+	}
+	route.fullUrl = filepath.Join(r.Prefix, route.Url)
+	if _, ok := r.routesByName[route.fullUrl]; ok {
+		panic(fmt.Errorf("Route with name '%s' already registered", r.Name))
+	}
+	re.slash2.ReplaceAllString(route.fullName, "/")
+
+	route.parse()
+	r.routesByName[route.fullName] = route
+	route.router = r
+	route.parsed = true
 }
 
 func (r *Router) match(ctx *Ctx) bool {
@@ -103,17 +121,7 @@ func (r *Router) AddRoute(route *Route) {
 		r.Routes = []*Route{}
 		r.routesByName = map[string]*Route{}
 	}
-	if route.Name == "" {
-		l.err.Panic("route need be named")
-	}
-	routeName := route.Name
-	if r.Name != "" {
-		routeName = r.Name + "." + route.Name
-	}
-	if _, ok := r.routesByName[routeName]; ok {
-		l.err.Panic("route named '" + route.Name + "' already registered!")
-	}
-	r.routesByName[routeName] = route
+	r.parseRoute(route)
 	r.Routes = append(r.Routes, route)
 }
 

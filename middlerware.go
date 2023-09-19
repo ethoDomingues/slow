@@ -1,7 +1,5 @@
 package slow
 
-func NewMiddleware(f ...Func) Middlewares {
-	return Middlewares(f)
-}
+type Middleware Func
 
 type Middlewares []Func

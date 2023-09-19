@@ -10,10 +10,14 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strings"
 
+	"github.com/gorilla/websocket"
 	"gopkg.in/yaml.v2"
 )
+
+var wsUpgrader = websocket.Upgrader{}
 
 func NewFile(p *multipart.Part) *File {
 	byts, err := io.ReadAll(p)
@@ -49,6 +53,7 @@ func NewRequest(req *http.Request, ctx *Ctx) *Request {
 
 		ContentLength: int(req.ContentLength),
 
+		Body:    bytes.NewBuffer(nil),
 		Args:    map[string]string{},
 		Mime:    map[string]string{},
 		Form:    map[string]any{},
@@ -57,6 +62,7 @@ func NewRequest(req *http.Request, ctx *Ctx) *Request {
 
 		Header: Header(req.Header),
 	}
+
 	return rq
 }
 
@@ -66,11 +72,13 @@ type Request struct {
 	ctx    *Ctx
 	Header Header
 
-	Body,
+	Body *bytes.Buffer
 	Method,
 	RemoteAddr,
 	RequestURI,
 	ContentType string
+
+	isWebsocket bool
 
 	ContentLength int
 
@@ -103,6 +111,11 @@ func (r *Request) parseHeaders() {
 	mi := r.ctx.MatchInfo
 	r.Query = r.URL.Query()
 	r.Args = re.getUrlValues(mi.Route.fullUrl, r.URL.Path)
+
+	head := r.Header
+	if head.Get("Connection") == "Upgrade" && head.Get("Upgrade") == "websocket" {
+		r.isWebsocket = true
+	}
 }
 
 func (r *Request) parseCookies() {
@@ -114,25 +127,25 @@ func (r *Request) parseCookies() {
 
 func (r *Request) parseBody() {
 	ctx := r.ctx
-	body := bytes.NewBuffer(nil)
-	body.Grow(int(r.ContentLength))
-	io.CopyBuffer(body, r.raw.Body, nil)
+	r.Body.Grow(r.ContentLength)
+	io.Copy(r.Body, r.raw.Body)
 	switch {
 	case r.ContentType == "", strings.HasPrefix(r.ContentType, "application/json"):
-		json.Unmarshal(body.Bytes(), &r.Form)
+		json.Unmarshal(r.Body.Bytes(), &r.Form)
 	case strings.HasPrefix(r.ContentType, "application/xml"):
-		e := xml.Unmarshal(body.Bytes(), &r.Form)
+		e := xml.Unmarshal(r.Body.Bytes(), &r.Form)
 		if e != nil {
-			ctx.Response.BadRequest(e)
+			l.err.Println(e)
+			ctx.Response.BadRequest()
 		}
 	case strings.HasPrefix(r.ContentType, "application/yaml"):
-		yaml.Unmarshal(body.Bytes(), &r.Form)
+		yaml.Unmarshal(r.Body.Bytes(), &r.Form)
 	case strings.HasPrefix(r.ContentType, "multipart/"):
-		mp := multipart.NewReader(body, r.Mime["boundary"])
+		mp := multipart.NewReader(r.Body, r.Mime["boundary"])
 		for {
 			p, err := mp.NextPart()
 			if err == io.EOF {
-				return
+				break
 			}
 			if err != nil {
 				ctx.Response.BadRequest()
@@ -140,19 +153,12 @@ func (r *Request) parseBody() {
 			if p.FileName() != "" {
 				file := NewFile(p)
 				r.Files[p.FormName()] = append(r.Files[p.FormName()], file)
-			} else {
-				val, err := io.ReadAll(p)
-				if err != nil {
-					continue
-				}
-				r.Form[p.FormName()] = string(val)
 			}
 		}
 	}
-	r.Body = body.String()
 }
 
-func (r *Request) parseRequest() {
+func (r *Request) parse() {
 	r.parseHeaders()
 	r.parseCookies()
 	r.parseBody()
@@ -162,12 +168,23 @@ func (r *Request) parseRequest() {
 }
 
 func (r *Request) parseSchema() {
-	data, err := r.ctx.SchemaFielder.MountSchema(r.Form)
+	sch := r.ctx.SchemaFielder
+	nSch, err := MountSchemaFromRequest(sch, r)
 	if err != nil {
-		r.ctx.Response.JSON(map[string]any{
-			"errors": err}, 400)
+		r.ctx.Response.JSON(err, 400)
 	}
-	r.ctx.Schema = data.Interface()
+
+	if sch.IsPointer {
+		if nSch.Kind() != reflect.Ptr && nSch.CanAddr() {
+			nSch = nSch.Addr()
+		}
+	} else {
+		if nSch.Kind() == reflect.Ptr {
+			nSch = nSch.Elem()
+		}
+	}
+
+	r.ctx.Schema = nSch.Interface()
 }
 
 // Returns the current url
@@ -219,6 +236,10 @@ func (r *Request) WithContext(ctx context.Context) *Request {
 	return NewRequest(r.raw.WithContext(ctx), r.ctx)
 }
 
+func (r *Request) Websocket(headers http.Header) (*websocket.Conn, error) {
+	return wsUpgrader.Upgrade(r.ctx.Response.raw, r.raw, headers)
+}
+
 func (r *Request) Clone(ctx context.Context) *Request {
 	return NewRequest(r.raw.Clone(ctx), r.ctx)
 }
@@ -239,6 +260,7 @@ func (r *Request) BasicAuth() (username, password string, ok bool) {
 func (r *Request) RawRequest() *http.Request {
 	return r.raw
 }
+
 func (r *Request) Referer() string {
 	return r.raw.Referer()
 }

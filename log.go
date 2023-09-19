@@ -28,14 +28,22 @@ const (
 )
 
 func newLogger(logFile string) *logger {
-
 	var lFile *log.Logger
 	if logFile != "" {
-		f, err := os.Open(logFile)
+		var f *os.File
+		_, err := os.Stat(logFile)
 		if err != nil {
-			panic(err)
+			f, err = os.Create(logFile)
+			if err != nil {
+				panic(err)
+			}
+		} else {
+			f, err = os.Open(logFile)
+			if err != nil {
+				panic(err)
+			}
 		}
-		lFile = log.New(f, _RED+"error: "+_RESET, 0)
+		lFile = log.New(f, "", log.Ldate|log.Ltime)
 	}
 
 	return &logger{
@@ -108,18 +116,21 @@ func (l *logger) LogRequest(ctx *Ctx) {
 		addr = rq.URL.Path
 	}
 
-	rd := ""
-	if ctx.App.Env != "development" {
-		rq.Header.Get("X-Real-Ip") // nginx cfg
-		if rd == "" {
-			rd = rq.RemoteAddr
-		}
-		if rd != "" {
-			rd = "[" + rd + "]"
-		}
+	rd := rq.RemoteAddr
+	if rd != "" {
+		rd = "[" + rd + "]"
 	}
-	l.info.Printf("%s %s%d%s -> %s -> %s", rd, color, rsp.StatusCode, _RESET, rq.Method, addr)
+
 	if l.logFile != nil {
 		l.logFile.Printf("%s %d -> %s -> %s", rd, rsp.StatusCode, rq.Method, addr)
 	}
+	if ctx.App.Silent {
+		return
+	}
+
+	appName := ""
+	if ctx.App.Name != "" {
+		appName = ctx.App.Name + ": "
+	}
+	l.info.Printf("%s%s %s%d%s -> %s -> %s", appName, rd, color, rsp.StatusCode, _RESET, rq.Method, addr)
 }

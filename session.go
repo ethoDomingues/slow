@@ -24,6 +24,9 @@ type Session struct {
 
 // validate a cookie session
 func (s *Session) validate(c *http.Cookie, secret string) {
+	if secret == "" {
+		return
+	}
 	str := c.Value
 	if jwt, ok := ValidJWT(str, secret); ok {
 		s.jwt = jwt
@@ -31,11 +34,7 @@ func (s *Session) validate(c *http.Cookie, secret string) {
 			s.Permanent = true
 		}
 	} else {
-		if secret != "" {
-			s.jwt = newJWT("")
-		} else {
-			s.jwt = NewJWT(secret)
-		}
+		s.jwt = NewJWT(secret)
 	}
 }
 
@@ -67,7 +66,7 @@ func (s *Session) save() *http.Cookie {
 	exp := s.expires
 	if len(s.jwt.Payload) == 0 {
 		return &http.Cookie{
-			Name:     "session",
+			Name:     "_session",
 			Value:    "",
 			HttpOnly: true,
 			Expires:  exp,
@@ -90,7 +89,7 @@ func (s *Session) save() *http.Cookie {
 	}
 	if len(s.jwt.Payload) == 0 {
 		return &http.Cookie{
-			Name:     "session",
+			Name:     "_session",
 			Value:    "",
 			MaxAge:   -0,
 			HttpOnly: true,
@@ -99,7 +98,7 @@ func (s *Session) save() *http.Cookie {
 	s.jwt.Payload["iat"] = fmt.Sprint(exp.Unix())
 
 	return &http.Cookie{
-		Name:     "session",
+		Name:     "_session",
 		Value:    s.jwt.Sign(),
 		HttpOnly: true,
 		Expires:  exp,
@@ -109,23 +108,4 @@ func (s *Session) save() *http.Cookie {
 // Returns a JWT Token from session data
 func (s *Session) GetSign() string {
 	return s.save().Value
-}
-
-func (s *Session) CheckUpdate(ctx *Ctx) {
-	update := false
-	if s.changed {
-		update = true
-	}
-	if !s.expires.IsZero() {
-		if s.expires.After(time.Now()) {
-			update = true
-		}
-	} else if !s.expiresPermanent.IsZero() {
-		if s.expires.Before(time.Now()) {
-			update = true
-		}
-	}
-	if update {
-
-	}
 }
