@@ -3,6 +3,7 @@ package slow
 import (
 	"errors"
 	"fmt"
+	"html/template"
 	"net"
 	"net/http"
 	"path/filepath"
@@ -22,9 +23,10 @@ var (
 		"prod":        "production",
 		"production":  "production",
 	}
-	l            = newLogger("")
-	listenInAll  bool
-	localAddress = getOutboundIP()
+	l             = newLogger("")
+	listenInAll   bool
+	localAddress  = getOutboundIP()
+	htmlTemplates map[string]*template.Template
 )
 
 // Returns a new app with a default settings
@@ -85,11 +87,12 @@ func (app *App) build() {
 		path := filepath.Join(staticUrl, fp)
 		app.AddRoute(&Route{
 			Url:       path,
-			Func:      handlerServeFile,
+			Func:      serveFileHandler,
 			Name:      "assets",
 			_isStatic: true,
 		})
 	}
+
 	// se o usuario mudar o router principal,
 	// isso evita alguns erro
 	if !app.is_main {
@@ -182,19 +185,14 @@ func execTeardown(ctx *Ctx) {
 func (app *App) execRoute(ctx *Ctx) {
 	rq := ctx.Request
 	mi := ctx.MatchInfo
-
 	if mi.Func == nil && rq.Method == "OPTIONS" {
 		optionsHandler(ctx)
 	} else {
 		rq.parse()
+		ctx.parseMids()
 		if app.BeforeRequest != nil {
 			app.BeforeRequest(ctx)
 		}
-
-		ctx.mids = append(ctx.mids, mi.Router.Middlewares...)
-		ctx.mids = append(ctx.mids, mi.Route.Middlewares...)
-		ctx.mids = append(ctx.mids, mi.Func)
-
 		ctx.Next()
 	}
 }
@@ -295,14 +293,12 @@ func (app *App) listRoutes() {
 
 func (app *App) match(ctx *Ctx) bool {
 	rq := ctx.Request
-
 	if app.Servername != "" {
 		rqUrl := rq.URL.Host
-		if !strings.Contains(rqUrl, app.Servername) {
-			fmt.Println(rqUrl, app.Servername)
+		if net.ParseIP(rqUrl) != nil {
 			return false
 		}
-		if net.ParseIP(rqUrl) != nil {
+		if !strings.Contains(rqUrl, app.Servername) {
 			return false
 		}
 	}
@@ -317,17 +313,10 @@ func (app *App) match(ctx *Ctx) bool {
 
 // http.Handler func
 func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
-
 	ctx := newCtx(app)
 	ctx.Request = NewRequest(req, ctx)
 	ctx.Response = NewResponse(wr, ctx)
-
 	defer app.closeConn(ctx)
-
-	if c, ok := ctx.Request.Cookies["_session"]; ok {
-		ctx.Session.validate(c, app.SecretKey)
-	}
-
 	if app.match(ctx) {
 		app.execRoute(ctx)
 	}
@@ -550,6 +539,9 @@ func (app *App) logStarterListener() {
 			l.Defaultf("Server is listening in %sdevelopment mode%s", _RED, _RESET)
 		} else {
 			l.Default("Server is linsten")
+		}
+		if addr == "" {
+			addr = "localhost"
 		}
 		l.info.Printf("          listening on: http://%s:%s", addr, port)
 	}

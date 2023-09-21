@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-func handlerServeFile(ctx *Ctx) {
+func serveFileHandler(ctx *Ctx) {
 	rsp := ctx.Response
 	rq := ctx.Request
 

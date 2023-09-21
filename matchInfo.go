@@ -14,13 +14,10 @@ var (
 
 type MatchInfo struct {
 	Func
-
 	Match            bool
+	Route            *Route
+	Router           *Router
 	MethodNotAllowed error
-
-	ctx    *Ctx
-	Route  *Route
-	Router *Router
 }
 
 type _re struct {

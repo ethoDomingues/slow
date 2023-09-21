@@ -25,6 +25,8 @@ type Router struct {
 	Prefix,
 	Subdomain string
 
+	EnableSwagger bool
+
 	Cors        *Cors
 	Routes      []*Route
 	Middlewares []Func
@@ -73,7 +75,7 @@ func (r *Router) parse(servername string) {
 func (r *Router) parseRoute(route *Route) {
 	if route.Name == "" {
 		if route.Func == nil {
-			l.err.Panic("route need be named")
+			panic("the route needs to be named or have a 'Route.Func'")
 		}
 		route.Name = getFunctionName(route.Func)
 	}
@@ -121,11 +123,10 @@ func (r *Router) AddRoute(route *Route) {
 		r.Routes = []*Route{}
 		r.routesByName = map[string]*Route{}
 	}
-	r.parseRoute(route)
 	r.Routes = append(r.Routes, route)
 }
 
-func (r *Router) AddAll(routes ...*Route) {
+func (r *Router) AddRoutes(routes ...*Route) {
 	for _, route := range routes {
 		r.AddRoute(route)
 	}

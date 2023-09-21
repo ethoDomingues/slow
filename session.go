@@ -95,7 +95,7 @@ func (s *Session) save() *http.Cookie {
 			HttpOnly: true,
 		}
 	}
-	s.jwt.Payload["iat"] = fmt.Sprint(exp.Unix())
+	s.jwt.Headers["iat"] = fmt.Sprint(exp.Unix())
 
 	return &http.Cookie{
 		Name:     "_session",

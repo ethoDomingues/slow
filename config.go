@@ -9,6 +9,7 @@ func NewConfig() *Config {
 	return &Config{
 		StaticFolder:            "assets",
 		StaticUrlPath:           "/assets",
+		TemplateFolder:          "templates/",
 		EnableStatic:            true,
 		SessionExpires:          time.Minute * 30,
 		SessionPermanentExpires: time.Hour * 744,
@@ -21,6 +22,7 @@ type Config struct {
 	SecretKey               string // for sign session
 	Servername              string // for build url routes and route match
 	StaticFolder            string // for serve static files
+	TemplateFolder          string // for render Templates Html. Default "templates/"
 	StaticUrlPath           string // url uf request static file
 	Silent                  bool   // don't print logs
 	EnableStatic            bool   // enable static endpoint for serving static files

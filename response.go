@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 
 	"github.com/ethoDomingues/c3po"
 )
@@ -150,8 +153,43 @@ func (r *Response) checkErrByEnv(err ...any) {
 	r.InternalServerError()
 }
 
+func (r *Response) RenderTemplate(tmpl string, data ...any) {
+	var (
+		t     *template.Template
+		ok    bool
+		value any
+	)
+
+	if t, ok = htmlTemplates[tmpl]; !ok || r.ctx.App.Env == "development" {
+		f, err := os.Open(filepath.Join(r.ctx.App.TemplateFolder, tmpl))
+		r.checkErr(err)
+		buf := bytes.NewBufferString("")
+		io.Copy(buf, f)
+		t, err = template.New(tmpl).Parse(buf.String())
+		r.checkErr(err)
+		if htmlTemplates == nil {
+			htmlTemplates = make(map[string]*template.Template)
+		}
+		htmlTemplates[tmpl] = t
+	}
+	if len(data) == 1 {
+		value = data[0]
+	}
+	t.Execute(r, value)
+}
+
 // Abort the current request. Server does not respond to client
 func (r *Request) Cancel() { r.Context().Done() }
 
 // Break execution, cleans up the response body, and writes the StatusCode to the response
 func Abort(code int) { panic("abort:" + fmt.Sprint(code)) }
+
+func (r *Response) checkErr(err error) {
+	if err != nil {
+		l.err.Println(err)
+		if r.ctx.App.Env == "developement" {
+			r.HTML(err, 500)
+		}
+		r.InternalServerError()
+	}
+}

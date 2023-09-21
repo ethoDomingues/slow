@@ -44,7 +44,13 @@ func echo(ctx *slow.Ctx) {
 }
 
 func home(ctx *slow.Ctx) {
- ctx.Response.HTML(`
+ ctx.Response.RenderTemplate("home.html")
+}
+```
+
+## *templates/home.html*
+
+```html
 <!DOCTYPE html>
 <html>
 <head>
@@ -122,6 +128,5 @@ You can change the message and send multiple times.
 </td></tr></table>
 </body>
 </html>
-`, 200)
-}
+`
 ```

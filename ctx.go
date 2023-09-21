@@ -6,15 +6,12 @@ import (
 
 // Returns a new *Slow.Ctx
 func newCtx(app *App) *Ctx {
-	c := &Ctx{
+	return &Ctx{
 		App:       app,
 		Global:    map[string]any{},
 		MatchInfo: &MatchInfo{},
+		Session:   newSession(app.SecretKey),
 	}
-	c.MatchInfo.ctx = c
-	c.Session = newSession(app.SecretKey)
-
-	return c
 }
 
 type Ctx struct {
@@ -42,12 +39,19 @@ type Ctx struct {
 
 // executes the next middleware or main function of the request
 func (ctx *Ctx) Next() {
-	if ctx.c_mid >= len(ctx.mids) {
+	if ctx.c_mid < len(ctx.mids) {
+		n := ctx.mids[ctx.c_mid]
+		ctx.c_mid += 1
+		n(ctx)
+	} else {
 		panic(ErrHttpAbort)
 	}
-	n := ctx.mids[ctx.c_mid]
-	ctx.c_mid += 1
-	n(ctx)
+}
+
+func (ctx *Ctx) parseMids() {
+	ctx.mids = append(ctx.mids, ctx.MatchInfo.Router.Middlewares...)
+	ctx.mids = append(ctx.mids, ctx.MatchInfo.Route.Middlewares...)
+	ctx.mids = append(ctx.mids, ctx.MatchInfo.Func)
 }
 
 func (ctx *Ctx) UrlFor(name string, external bool, args ...string) string {

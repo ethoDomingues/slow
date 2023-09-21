@@ -123,6 +123,9 @@ func (r *Request) parseCookies() {
 	for _, c := range cs {
 		r.Cookies[c.Name] = c
 	}
+	if c, ok := r.Cookies["_session"]; ok {
+		r.ctx.Session.validate(c, r.ctx.App.SecretKey)
+	}
 }
 
 func (r *Request) parseBody() {
@@ -133,13 +136,16 @@ func (r *Request) parseBody() {
 	case r.ContentType == "", strings.HasPrefix(r.ContentType, "application/json"):
 		json.Unmarshal(r.Body.Bytes(), &r.Form)
 	case strings.HasPrefix(r.ContentType, "application/xml"):
-		e := xml.Unmarshal(r.Body.Bytes(), &r.Form)
-		if e != nil {
-			l.err.Println(e)
-			ctx.Response.BadRequest()
-		}
+		xml.Unmarshal(r.Body.Bytes(), &r.Form)
 	case strings.HasPrefix(r.ContentType, "application/yaml"):
 		yaml.Unmarshal(r.Body.Bytes(), &r.Form)
+	case strings.HasPrefix(r.ContentType, "application/x-www-form-urlencoded"):
+		v, err := url.ParseQuery(r.Body.String())
+		if err == nil {
+			for k, _v := range v {
+				r.Form[k] = _v[0]
+			}
+		}
 	case strings.HasPrefix(r.ContentType, "multipart/"):
 		mp := multipart.NewReader(r.Body, r.Mime["boundary"])
 		for {
@@ -262,5 +268,5 @@ func (r *Request) RawRequest() *http.Request {
 }
 
 func (r *Request) Referer() string {
-	return r.raw.Referer()
+	return r.Header.Get("Referer")
 }
