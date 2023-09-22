@@ -32,20 +32,20 @@ type Route struct {
 	MapCtrl     MapCtrl
 	Middlewares Middlewares
 
-	router   *Router
-	fullUrl  string
-	fullName string
-	urlRegex []*regexp.Regexp
+	router     *Router
+	simpleUrl  string
+	simpleName string
+	urlRegex   []*regexp.Regexp
 
 	parsed,
 	_isStatic bool
 }
 
 func (r *Route) compileUrl() {
-	url := r.fullUrl
+	url := r.Url
 	addEnd := false
 	if url != "" && url != "/" {
-		url = strings.TrimPrefix(r.fullUrl, "/")
+		url = strings.TrimPrefix(r.Url, "/")
 		url = strings.TrimSuffix(url, "/")
 		strs := strings.Split(url, "/")
 
@@ -69,7 +69,7 @@ func (r *Route) compileUrl() {
 	} else {
 		addEnd = true
 	}
-	if strings.HasSuffix(r.fullUrl, "/") {
+	if strings.HasSuffix(r.Url, "/") {
 		addEnd = true
 	}
 	if addEnd {
@@ -88,7 +88,7 @@ func (r *Route) compileMethods() {
 	for verb, meth := range r.MapCtrl {
 		v := strings.ToUpper(verb)
 		if !reMethods.MatchString(v) {
-			l.err.Fatalf("route '%s' has invalid Request Method: '%s'", r.fullName, verb)
+			l.err.Fatalf("route '%s' has invalid Request Method: '%s'", r.Name, verb)
 		}
 		if meth.Schema != nil {
 			sch := c3po.ParseSchemaWithTag("slow", meth.Schema)
@@ -104,7 +104,7 @@ func (r *Route) compileMethods() {
 	for _, verb := range r.Methods {
 		v := strings.ToUpper(verb)
 		if !reMethods.MatchString(v) {
-			l.err.Fatalf("route '%s' has invalid Request Method: '%s'", r.fullName, verb)
+			l.err.Fatalf("route '%s' has invalid Request Method: '%s'", r.Name, verb)
 		}
 
 		if _, ok := r.MapCtrl[v]; !ok {
@@ -139,7 +139,7 @@ func (r *Route) compileMethods() {
 
 func (r *Route) parse() {
 	if r.Func == nil && r.MapCtrl == nil {
-		l.err.Fatalf("Route '%s' need a Func or Ctrl\n", r.fullName)
+		l.err.Fatalf("Route '%s' need a Func or Ctrl\n", r.Name)
 	}
 
 	r.compileUrl()
@@ -154,7 +154,7 @@ func (r *Route) parse() {
 
 func (r *Route) matchURL(ctx *Ctx, url string) bool {
 	// if url == /  and route.Url == /
-	if url == "/" && url == r.fullUrl {
+	if url == "/" && url == r.Url {
 		return true
 	}
 

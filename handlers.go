@@ -21,26 +21,24 @@ func serveFileHandler(ctx *Ctx) {
 	pathToFile := strings.TrimPrefix(uri, static)
 	pathToFile = filepath.Join(ctx.App.StaticFolder, pathToFile)
 	if f, err := os.Open(pathToFile); err == nil {
-
 		_, file := filepath.Split(pathToFile)
 		defer f.Close()
 		if fStat, err := f.Stat(); err != nil || fStat.IsDir() {
 			rsp.NotFound()
 		}
 		io.Copy(rsp, f)
-
 		ctype := mime.TypeByExtension(filepath.Ext(file))
-
 		if ctype == "application/octet-stream" {
 			ctype = http.DetectContentType(rsp.Bytes())
 		}
-
-		rsp.Header.Set("Content-Type", ctype)
+		rsp.Headers.Set("Content-Type", ctype)
 		rsp.Close()
 	} else {
-		rsp.TEXT(err, 404)
+		if ctx.App.Env == "development" {
+			rsp.TEXT(err, 404)
+		}
+		ctx.Response.NotFound()
 	}
-
 }
 
 func ServeFile(ctx *Ctx, pathToFile ...string) {
@@ -58,7 +56,7 @@ func ServeFile(ctx *Ctx, pathToFile ...string) {
 		if ctype == "application/octet-stream" {
 			ctype = http.DetectContentType(rsp.Bytes())
 		}
-		rsp.Header.Set("Content-Type", ctype)
+		rsp.Headers.Set("Content-Type", ctype)
 		rsp.Close()
 	} else if ctx.App.Env != "prod" {
 		rsp.checkErrByEnv(err)
@@ -73,10 +71,10 @@ func optionsHandler(ctx *Ctx) {
 
 	rsp.StatusCode = 200
 	strMeths := mi.Route.Cors.AllowMethods
-	if rsp.Header.Get("Access-Control-Allow-Methods") == "" {
-		rsp.Header.Set("Access-Control-Allow-Methods", strMeths)
+	if rsp.Headers.Get("Access-Control-Allow-Methods") == "" {
+		rsp.Headers.Set("Access-Control-Allow-Methods", strMeths)
 	}
 
 	rsp.parseHeaders()
-	rsp.Header.Save(rsp.raw)
+	rsp.Headers.Save(rsp.raw)
 }

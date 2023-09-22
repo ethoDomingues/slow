@@ -68,6 +68,7 @@ type App struct {
 
 // Parse the router and your routes
 func (app *App) build() {
+	app.checkConfig()
 	if app.Servername != "" {
 		srv := app.Servername
 		srv = strings.TrimPrefix(srv, ".")
@@ -138,7 +139,7 @@ func (app *App) closeConn(ctx *Ctx) {
 				rsp.SetCookie(ctx.Session.save())
 			}
 			rsp.parseHeaders()
-			rsp.Header.Save(rsp.raw)
+			rsp.Headers.Save(rsp.raw)
 		} else {
 			if mi.MethodNotAllowed != nil {
 				rsp.StatusCode = 405
@@ -207,17 +208,17 @@ func (app *App) listRoutes() {
 
 	listRouteName := []string{}
 	for _, r := range app.routesByName {
-		listRouteName = append(listRouteName, r.fullName)
-		if nl := len(r.fullName); nl > nameLen {
+		listRouteName = append(listRouteName, r.Name)
+		if nl := len(r.Name); nl > nameLen {
 			nameLen = nl
 		}
 		if ml := len(strings.Join(r.Methods, ",")); ml > methLen {
 			methLen = ml
 		}
-		if pl := len(r.fullUrl); pl > pathLen {
+		if pl := len(r.Url); pl > pathLen {
 			pathLen = pl
 		}
-		if sName := strings.Split(r.fullName, "."); len(sName) == 2 {
+		if sName := strings.Split(r.Name, "."); len(sName) == 2 {
 			router := app.routerByName[sName[0]]
 			if router != nil && router.Subdomain != "" {
 				if l := len(router.Subdomain); l > subDoLen {
@@ -261,12 +262,12 @@ func (app *App) listRoutes() {
 			mths_ := strings.Join(r.Methods, ",")
 			space1 := nameLen - len(rName)
 			space2 := methLen - len(mths_)
-			space3 := pathLen - len(r.fullUrl)
+			space3 := pathLen - len(r.Url)
 			space4 := subDoLen - len(r.GetRouter().Subdomain)
 
-			endpoint := r.fullName + strings.Repeat(" ", space1)
+			endpoint := r.Name + strings.Repeat(" ", space1)
 			mths := mths_ + strings.Repeat(" ", space2)
-			path := r.fullUrl + strings.Repeat(" ", space3)
+			path := r.Url + strings.Repeat(" ", space3)
 			sub := r.GetRouter().Subdomain + strings.Repeat(" ", space4)
 			fmt.Printf("| %s | %s | %s | %s |\n", endpoint, mths, path, sub)
 		}
@@ -280,11 +281,11 @@ func (app *App) listRoutes() {
 			mths_ := strings.Join(r.Methods, ",")
 			space1 := nameLen - len(rName)
 			space2 := methLen - len(mths_)
-			space3 := pathLen - len(r.fullUrl)
+			space3 := pathLen - len(r.Url)
 
-			endpoint := r.fullName + strings.Repeat(" ", space1)
+			endpoint := r.Name + strings.Repeat(" ", space1)
 			mths := mths_ + strings.Repeat(" ", space2)
-			path := r.fullUrl + strings.Repeat(" ", space3)
+			path := r.Url + strings.Repeat(" ", space3)
 			fmt.Printf("| %s | %s | %s |\n", endpoint, mths, path)
 		}
 		fmt.Printf("+-%s+-%s+-%s+\n", line1, line2, line3)
@@ -305,6 +306,13 @@ func (app *App) match(ctx *Ctx) bool {
 
 	for _, router := range app.routers {
 		if router.match(ctx) {
+			if router.StrictSlash && !strings.HasSuffix(rq.URL.Path, "/") {
+				args := []string{}
+				for k, v := range rq.Args {
+					args = append(args, k, v)
+				}
+				ctx.Response.Redirect(ctx.UrlFor(ctx.MatchInfo.Route.Name, true, args...))
+			}
 			return true
 		}
 	}
@@ -401,7 +409,7 @@ func (app *App) UrlFor(name string, external bool, args ...string) string {
 		panic(fmt.Sprintf("Route '%s' is undefined \n", name))
 	}
 	// Pre Build
-	var sUrl = strings.Split(route.fullUrl, "/")
+	var sUrl = strings.Split(route.Url, "/")
 	var urlBuf strings.Builder
 	// Build Host
 	if external {
@@ -550,6 +558,8 @@ func (app *App) logStarterListener() {
 // Build a app and starter Server
 func (app *App) Listen(host ...string) {
 	app.Build(host...)
-	app.logStarterListener()
+	if !app.Silent {
+		app.logStarterListener()
+	}
 	app.srv.ListenAndServe()
 }

@@ -18,7 +18,7 @@ func NewResponse(wr http.ResponseWriter, ctx *Ctx) *Response {
 		Buffer:     bytes.NewBufferString(""),
 		raw:        wr,
 		ctx:        ctx,
-		Header:     Header{},
+		Headers:    Header{},
 		StatusCode: 200,
 	}
 }
@@ -28,10 +28,22 @@ type Response struct {
 
 	StatusCode int
 
-	Header Header
+	Headers Header
 
 	ctx *Ctx
 	raw http.ResponseWriter
+}
+
+func (r Response) Header() http.Header {
+	return http.Header(r.Headers)
+}
+
+func (r Response) Write(b []byte) (int, error) {
+	return r.Buffer.Write(b)
+}
+
+func (r Response) WriteHeader(statusCode int) {
+	(&r).StatusCode = statusCode
 }
 
 func (r *Response) RawResponse() http.ResponseWriter {
@@ -51,12 +63,12 @@ func (r *Response) parseHeaders() {
 	method := ctx.Request.Method
 	routerCors := ctx.MatchInfo.Router.Cors
 	if routerCors != nil {
-		routerCors.parse(r.Header)
+		routerCors.parse(r.Headers)
 	}
 	routeCors := ctx.MatchInfo.Route.Cors
-	h := r.Header
+	h := r.Headers
 	if routeCors != nil {
-		routeCors.parse(r.Header)
+		routeCors.parse(r.Headers)
 	}
 	if routerCors != nil || routeCors != nil {
 		if _, ok := h["Access-Control-Request-Method"]; !ok {
@@ -82,15 +94,15 @@ func (r *Response) parseHeaders() {
 }
 
 // Set a cookie in the Headers of Response
-func (r *Response) SetCookie(cookie *http.Cookie) { r.Header.SetCookie(cookie) }
+func (r *Response) SetCookie(cookie *http.Cookie) { r.Headers.SetCookie(cookie) }
 
 // Redirect to Following URL
 func (r *Response) Redirect(url string) {
 	r.Reset()
-	r.Header.Set("Location", url)
+	r.Headers.Set("Location", url)
 	r.StatusCode = 302
 
-	r.Header.Set("Content-Type", "text/html; charset=utf-8")
+	r.Headers.Set("Content-Type", "text/html; charset=utf-8")
 	r.WriteString("<a href=\"" + c3po.HtmlEscape(url) + "\"> Manual Redirect </a>.\n")
 	panic(ErrHttpAbort)
 }
@@ -104,7 +116,7 @@ func (r *Response) JSON(body any, code int) {
 	}
 
 	r.StatusCode = code
-	r.Header.Set("Content-Type", "application/json")
+	r.Headers.Set("Content-Type", "application/json")
 	r.Write(j)
 	panic(ErrHttpAbort)
 }
@@ -112,7 +124,7 @@ func (r *Response) JSON(body any, code int) {
 func (r *Response) TEXT(body any, code int) {
 	r.Reset()
 	r.StatusCode = code
-	r.Header.Set("Content-Type", "text/plain")
+	r.Headers.Set("Content-Type", "text/plain")
 	r._write(body)
 	panic(ErrHttpAbort)
 }
@@ -129,7 +141,7 @@ func (r *Response) textCode(body any, code int) {
 func (r *Response) HTML(body any, code int) {
 	r.Reset()
 	r.StatusCode = code
-	r.Header.Set("Content-Type", "text/html")
+	r.Headers.Set("Content-Type", "text/html")
 	r._write(body)
 	panic(ErrHttpAbort)
 }
@@ -164,8 +176,11 @@ func (r *Response) RenderTemplate(tmpl string, data ...any) {
 		f, err := os.Open(filepath.Join(r.ctx.App.TemplateFolder, tmpl))
 		r.checkErr(err)
 		buf := bytes.NewBufferString("")
-		io.Copy(buf, f)
-		t, err = template.New(tmpl).Parse(buf.String())
+		_, err = io.Copy(buf, f)
+		r.checkErr(err)
+		t, err = template.New(tmpl).
+			Funcs(r.ctx.App.TemplateFuncs).
+			Parse(buf.String())
 		r.checkErr(err)
 		if htmlTemplates == nil {
 			htmlTemplates = make(map[string]*template.Template)

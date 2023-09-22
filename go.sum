@@ -1,3 +1,5 @@
+github.com/ethoDomingues/c3po v0.0.0-20230922100847-ee87e9c93e96 h1:PD/QFlm6+ylpgDypjKMTT06F3PLPIabEFg1zyEEpUO0=
+github.com/ethoDomingues/c3po v0.0.0-20230922100847-ee87e9c93e96/go.mod h1:bhVj01VV+1fzqPFjIJiets4KWaZngmcrevRQ4IZLhT4=
 github.com/gorilla/websocket v1.5.0 h1:PPwGk2jz7EePpoHN/+ClbZu8SPxiqlu12wZP/3sWmnc=
 github.com/gorilla/websocket v1.5.0/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 golang.org/x/exp v0.0.0-20230515195305-f3d0a9c9a5cc h1:mCRnTeVUjcrhlRmO0VK8a6k6Rrf6TF9htwo2pJVSjIU=

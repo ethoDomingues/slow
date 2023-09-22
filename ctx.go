@@ -1,6 +1,8 @@
 package slow
 
 import (
+	"net/http"
+
 	"github.com/ethoDomingues/c3po"
 )
 
@@ -56,4 +58,18 @@ func (ctx *Ctx) parseMids() {
 
 func (ctx *Ctx) UrlFor(name string, external bool, args ...string) string {
 	return ctx.App.UrlFor(name, external, args...)
+}
+
+func (app *App) TestCtx(req ...*http.Request) *Ctx {
+	if !app.built {
+		l.err.Panic("Vc ta tentando usar o Ctx fora do contexto. Vc precisa Buildar o app primeiro")
+	}
+	var rq *http.Request
+	if len(req) > 0 {
+		rq = req[0]
+	}
+	ctx := newCtx(app)
+	ctx.Request = NewRequest(rq, ctx)
+	ctx.Response = NewResponse(Response{}, ctx)
+	return ctx
 }

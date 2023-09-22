@@ -24,6 +24,7 @@ type Router struct {
 	Name,
 	Prefix,
 	Subdomain string
+	StrictSlash bool
 
 	EnableSwagger bool
 
@@ -79,24 +80,25 @@ func (r *Router) parseRoute(route *Route) {
 		}
 		route.Name = getFunctionName(route.Func)
 	}
+	route.simpleName = r.Name
 	if r.Name != "" {
-		route.fullName = r.Name + "." + route.Name
-	} else {
-		route.fullName = route.Name
+		route.Name = r.Name + "." + route.Name
 	}
 	if r.Prefix != "" && !strings.HasPrefix(r.Prefix, "/") {
 		panic(fmt.Errorf("Router '%v' Prefix must start with slash or be a null string ", r.Name))
 	} else if route.Url != "" && (!strings.HasPrefix(route.Url, "/") && !strings.HasSuffix(r.Prefix, "/")) {
 		panic(fmt.Errorf("Route '%v' Prefix must start with slash or be a null String", r.Name))
 	}
-	route.fullUrl = filepath.Join(r.Prefix, route.Url)
-	if _, ok := r.routesByName[route.fullUrl]; ok {
+	if route.Url == "" {
+		route.Url = "/"
+	}
+	route.simpleUrl = route.Url
+	route.Url = filepath.Join(r.Prefix, route.Url)
+	if _, ok := r.routesByName[route.Url]; ok {
 		panic(fmt.Errorf("Route with name '%s' already registered", r.Name))
 	}
-	re.slash2.ReplaceAllString(route.fullName, "/")
-
 	route.parse()
-	r.routesByName[route.fullName] = route
+	r.routesByName[route.Name] = route
 	route.router = r
 	route.parsed = true
 }

@@ -110,7 +110,7 @@ func (r *Request) parseHeaders() {
 	r.Mime = params
 	mi := r.ctx.MatchInfo
 	r.Query = r.URL.Query()
-	r.Args = re.getUrlValues(mi.Route.fullUrl, r.URL.Path)
+	r.Args = re.getUrlValues(mi.Route.Url, r.URL.Path)
 
 	head := r.Header
 	if head.Get("Connection") == "Upgrade" && head.Get("Upgrade") == "websocket" {
@@ -200,7 +200,7 @@ func (r *Request) RequestURL() string {
 	for k, v := range r.Args {
 		args = append(args, k, v)
 	}
-	return r.ctx.App.UrlFor(route.fullName, true, args...)
+	return r.ctx.App.UrlFor(route.Name, true, args...)
 }
 
 /*

@@ -1,34 +1,57 @@
 package slow
 
 import (
+	"html/template"
 	"reflect"
 	"time"
 )
 
 func NewConfig() *Config {
-	return &Config{
-		StaticFolder:            "assets",
-		StaticUrlPath:           "/assets",
-		TemplateFolder:          "templates/",
-		EnableStatic:            true,
-		SessionExpires:          time.Minute * 30,
-		SessionPermanentExpires: time.Hour * 744,
-	}
+	return &Config{}
 }
 
 type Config struct {
-	Env                     string // environmnt
-	LogFile                 string // save log info in file
-	SecretKey               string // for sign session
-	Servername              string // for build url routes and route match
-	StaticFolder            string // for serve static files
-	TemplateFolder          string // for render Templates Html. Default "templates/"
-	StaticUrlPath           string // url uf request static file
-	Silent                  bool   // don't print logs
-	EnableStatic            bool   // enable static endpoint for serving static files
-	ListeningInTLS          bool   // UrlFor return a URl with schema in "https:"
+	Env            string // environmnt
+	SecretKey      string // for sign session
+	Servername     string // for build url routes and route match
+	ListeningInTLS bool   // UrlFor return a URl with schema in "https:"
+
+	TemplateFolder string // for render Templates Html. Default "templates/"
+	TemplateFuncs  template.FuncMap
+
+	StaticFolder  string // for serve static files
+	StaticUrlPath string // url uf request static file
+	EnableStatic  bool   // enable static endpoint for serving static files
+
+	Silent  bool   // don't print logs
+	LogFile string // save log info in file
+
 	SessionExpires          time.Duration
 	SessionPermanentExpires time.Duration
+}
+
+func (c *Config) checkConfig() {
+	if c.Env == "" {
+		c.Env = "development"
+	}
+	if c.StaticFolder == "" {
+		c.StaticFolder = "assets"
+	}
+	if c.TemplateFolder == "" {
+		c.TemplateFolder = "templates/"
+	}
+	if c.TemplateFuncs == nil {
+		c.TemplateFuncs = make(template.FuncMap)
+	}
+	if c.StaticUrlPath == "" {
+		c.StaticUrlPath = "/assets"
+	}
+	if c.SessionExpires == 0 {
+		c.SessionExpires = time.Minute * 30
+	}
+	if c.SessionPermanentExpires == 0 {
+		c.SessionPermanentExpires = time.Hour * 744
+	}
 }
 
 func (c *Config) getField(name string) reflect.Value {
