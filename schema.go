@@ -1,158 +1,176 @@
 package slow
 
 import (
+	"bytes"
+	"errors"
+	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/ethoDomingues/c3po"
 )
 
-func MountSchemaFromRequest(f *c3po.Fielder, req *Request) (reflect.Value, any) {
-
-	var errs any
-	var sch reflect.Value
-	var v any
-	in, ok := f.Tags["in"]
-	if ok {
-		switch in {
-		default:
-			v = req.Form[f.Name]
-		case "files":
-			v = req.Files[f.Name]
-		case "headers":
-			v = req.Header.Get(f.Name)
-		case "query":
-			v = req.Query.Get(f.Name)
-		}
-	} else {
-		v = req.Form
-	}
-
+func MountSchemaFromRequest(f *c3po.Fielder, rq *Request) (any, error) {
+	var sch any
+	var err error
+	var errs = []error{}
 	switch f.Type {
 	default:
-		_sch := reflect.TypeOf(f.Schema)
-		if _sch.Kind() == reflect.Ptr {
-			_sch = _sch.Elem()
+		v, isFile := getData(f, rq)
+		schT := reflect.TypeOf(f.Schema)
+		if schT.Kind() == reflect.Ptr {
+			schT = schT.Elem()
 		}
 		if v == nil || v == "" {
 			if f.Required {
-				return reflect.Value{}, c3po.RetMissing(f)
+				return nil, c3po.RetMissing(f)
 			}
-			sch = reflect.New(_sch).Elem()
+			sch = reflect.New(schT).Elem()
 			break
 		}
-
-		if _v, ok := v.(map[string]any); ok {
-			if _, ok := _v[f.Name]; !ok {
-				if f.Required {
-					return reflect.Value{}, c3po.RetMissing(f)
-				}
-				sch = reflect.New(_sch).Elem()
-				break
+		if isFile {
+			if f.IsSlice {
+				return v, nil
 			}
-			v = _v[f.Name]
+			return v.([]*File)[0], nil
 		}
-
-		sch = reflect.New(_sch).Elem()
+		_sch := reflect.New(schT).Elem()
 		schV := reflect.ValueOf(v)
-		if !c3po.SetReflectValue(sch, &schV, f.Escape) {
-			return reflect.Value{}, c3po.RetInvalidType(f)
+		if !c3po.SetReflectValue(_sch, schV, f.Escape) {
+			return nil, c3po.RetInvalidType(f)
 		}
-	case reflect.Array, reflect.Slice:
-		if _v, ok := v.(map[string]any); ok {
-			if _, ok := _v[f.Name]; !ok {
-				if f.Required {
-					return reflect.Value{}, c3po.RetMissing(f)
-				}
-				sch = reflect.MakeSlice(
-					reflect.SliceOf(
-						reflect.TypeOf(
-							f.SliceType.Schema)), 0, 0)
-				break
+		return f.CheckSchPtr(_sch), nil
+	case reflect.Slice:
+		v, isFile := getData(f, rq)
+		if v == nil {
+			sch = reflect.MakeSlice(reflect.SliceOf(reflect.TypeOf(f.SliceType.Schema)), 0, 0)
+			if f.Required {
+				return nil, c3po.RetMissing(f)
 			}
-			v = _v[f.Name]
+			return sch.(reflect.Value).Interface(), nil
 		}
-		schVal := reflect.ValueOf(v)
-		if schVal.Kind() == reflect.Ptr {
-			schVal = schVal.Elem()
+		if isFile {
+			return v, nil
+		} else {
+			sch, err = f.Decode(v)
 		}
-		if schVal.Kind() != reflect.Slice {
-			errs = c3po.RetInvalidType(f)
-			break
+		if err != nil {
+			errs = append(errs, err)
 		}
 
-		sliceOf := reflect.TypeOf(f.SliceType.Schema)
-		lenSlice := schVal.Len()
-		sch = reflect.MakeSlice(reflect.SliceOf(sliceOf), lenSlice, lenSlice)
-		_errs := []any{}
-		for i := 0; i < lenSlice; i++ {
-			s := schVal.Index(i)
-			sf := f.SliceType
-
-			slicSch, err := sf.MountSchema(s.Interface())
-			if err != nil {
-				_errs = append(_errs, err)
-				if f.SliceStrict {
-					break
-				}
-			}
-			sItem := sch.Index(i)
-			sItem.Set(slicSch)
-		}
-		if len(_errs) > 0 {
-			if len(_errs) == 1 {
-				errs = _errs[0]
-			} else {
-				errs = _errs
-			}
-		}
 	case reflect.Struct:
-		_errs := []any{}
-		_sch := reflect.TypeOf(f.Schema)
-		if _sch.Kind() == reflect.Ptr {
-			_sch = _sch.Elem()
-		}
-		sch = reflect.New(_sch).Elem()
+		rt := reflect.TypeOf(f.Schema).Elem()
+		_sch := reflect.New(rt).Elem()
+		for i := 0; i < rt.NumField(); i++ {
+			fName := f.FieldsByIndex[i]
+			fielder := f.Children[fName]
+			rtField := _sch.Field(i)
 
-		for i := 0; i < sch.NumField(); i++ {
-			fieldName := f.FieldsByIndex[i]
-			fielder := f.Children[fieldName]
-			schF := sch.FieldByName(fieldName)
-
-			rv, __errs := MountSchemaFromRequest(fielder, req)
-			if __errs != nil {
-				_errs = append(_errs, __errs)
+			v, isFile := getData(fielder, rq)
+			if v == nil {
+				if fielder.Required {
+					errs = append(errs, c3po.RetMissing(fielder))
+				}
 				continue
 			}
-
-			if !c3po.SetReflectValue(schF, &rv, false) {
-				_errs = append(_errs, map[string]any{fielder.Name: c3po.RetInvalidType(fielder)})
-				continue
-			}
-		}
-		if len(_errs) > 0 {
-			if len(_errs) == 1 {
-				errs = _errs[0]
+			if isFile {
+				if v != nil && !fielder.IsSlice {
+					_v, ok := v.([]*File)
+					if ok && len(_v) > 0 {
+						v = _v[0]
+					} else {
+						if fielder.Required {
+							errs = append(errs, c3po.RetMissing(fielder))
+						}
+						continue
+					}
+				}
+				if !c3po.SetReflectValue(rtField, reflect.ValueOf(v), false) {
+					errs = append(errs, c3po.RetInvalidType(fielder))
+				}
 			} else {
-				errs = _errs
+				schF, e := fielder.Decode(v)
+
+				if e != nil {
+					errs = append(errs, e)
+				} else {
+					if !c3po.SetReflectValue(rtField, reflect.ValueOf(schF), fielder.Escape) {
+						errs = append(errs, c3po.RetInvalidType(fielder))
+					}
+				}
 			}
+		}
+		if len(errs) == 0 {
+			sch = f.CheckSchPtr(_sch)
 		}
 	}
-
-	if errs != nil {
+	if len(errs) > 0 {
 		if f.Name != "" {
-			return sch, map[string]any{f.Name: errs}
+			return sch, fmt.Errorf(`{"%s":%v}`, f.Name, formatErr(errs...))
 		}
-		if slcErr, ok := errs.([]any); ok && len(slcErr) == 1 {
-			return sch, slcErr[0]
-		} else {
-			if mapErrs, ok := errs.(map[string]any); ok && len(mapErrs) == 1 {
-				for _, err := range mapErrs {
-					return sch, err
-				}
-			}
-			return sch, errs
-		}
-
+		return nil, formatErr(errs...)
 	}
 	return sch, nil
+}
+
+func formatErr(errs ...error) error {
+	if len(errs) > 1 {
+		errBuf := bytes.NewBufferString("[")
+		for i, e := range errs {
+			if i > 0 {
+				errBuf.WriteString(",")
+			}
+			errBuf.WriteString(e.Error())
+		}
+		errBuf.WriteString("]")
+		return errors.New(errBuf.String())
+	}
+	if len(errs) == 1 {
+		e := errs[0]
+		if e != nil {
+			return e
+		}
+	}
+	return nil
+}
+
+func getData(f *c3po.Fielder, rq *Request) (any, bool) {
+	fName := f.Name
+	if fName == "" {
+		fName = f.RealName
+	}
+	if fName == "" {
+		return nil, false
+	}
+	isFile := false
+	if _, ok := f.Schema.([]*File); ok {
+		isFile = true
+	}
+	if _, ok := f.Schema.(*File); ok {
+		isFile = true
+	}
+
+	switch strings.ToLower(f.Tags["in"]) {
+	default:
+		if isFile {
+			return rq.Files[f.Name], true
+		}
+		return rq.Form[f.Name], false
+	case "files":
+		return rq.Files[f.Name], true
+	case "headers":
+		return rq.Header.Get(f.Name), false
+	case "query":
+		return rq.Query.Get(f.Name), false
+	case "auth":
+		if u, p, ok := rq.BasicAuth(); ok {
+			if f.Name == "user" {
+				return u, false
+			} else if f.Name == "password" {
+				return p, false
+			}
+		}
+
+	}
+	return nil, false
 }

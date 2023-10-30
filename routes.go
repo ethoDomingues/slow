@@ -2,13 +2,15 @@ package slow
 
 import (
 	"fmt"
+	"log"
+	"net/http"
 	"regexp"
 	"strings"
 
 	"github.com/ethoDomingues/c3po"
 )
 
-type Func func(*Ctx)
+type Func func(ctx *Ctx)
 
 type Schema any
 
@@ -33,70 +35,77 @@ type Route struct {
 	Middlewares Middlewares
 
 	router     *Router
-	simpleUrl  string
 	simpleName string
-	urlRegex   []*regexp.Regexp
+
+	simpleUrl   string
+	urlRegex    []*regexp.Regexp
+	isUrlPrefix bool
 
 	parsed,
 	_isStatic bool
+	hasSufix bool
 }
 
 func (r *Route) compileUrl() {
-	url := r.Url
-	addEnd := false
-	if url != "" && url != "/" {
-		url = strings.TrimPrefix(r.Url, "/")
-		url = strings.TrimSuffix(url, "/")
-		strs := strings.Split(url, "/")
+	uri := r.Url
+	isPrefix := false
+	r.hasSufix = strings.HasSuffix(r.simpleUrl, "/")
+	if uri != "" && uri != "/" {
+		uri = strings.TrimPrefix(strings.TrimSuffix(uri, "/"), "/")
+		strs := strings.Split(uri, "/")
 
 		for _, str := range strs {
 			if str == "" {
 				continue
 			}
+			if isPrefix {
+				log.Panicf("Url Variable Invalid: '%s'", str)
+			}
+			if re.all.MatchString(str) {
+				isPrefix = true
+			}
 			if re.dot2.MatchString(str) {
-				re.dot2.ReplaceAllString(str, "/")
+				str = re.dot2.ReplaceAllString(str, "/")
 			}
 			if re.slash2.MatchString(str) {
-				re.slash2.ReplaceAllString(str, "/")
+				str = re.slash2.ReplaceAllString(str, "/")
 			}
+
 			if re.isVar.MatchString(str) {
 				str = re.str.ReplaceAllString(str, `(([\x00-\x7F]+)([^\\\/\s]+)|\d+)`)
 				str = re.digit.ReplaceAllString(str, `(\d+)`)
-				str = re.filepath.ReplaceAllString(str, `(.{0,})`)
 			}
-			r.urlRegex = append(r.urlRegex, regexp.MustCompile(fmt.Sprintf("^%s$", str)))
+			if !isPrefix {
+				r.urlRegex = append(r.urlRegex, regexp.MustCompile(fmt.Sprintf("^%s$", str)))
+			}
 		}
-	} else {
-		addEnd = true
 	}
-	if strings.HasSuffix(r.Url, "/") {
-		addEnd = true
+	if r.hasSufix {
+		r.Url = r.Url + "/"
 	}
-	if addEnd {
-		r.urlRegex = append(r.urlRegex, regexp.MustCompile(`^(\/)?$`))
-	}
+	r.isUrlPrefix = isPrefix
 }
 
 func (r *Route) compileMethods() {
 	ctrl := MapCtrl{"OPTIONS": &Meth{}}
 
-	// alow Route{URL:"/",Name:"index",Func:func()} with method default "GET"
+	// allow Route{URL:"/",Name:"index",Func:func()} with method default "GET"
 	if len(r.MapCtrl) == 0 && len(r.Methods) == 0 {
 		r.Methods = []string{"GET"}
 	}
 
-	for verb, meth := range r.MapCtrl {
+	for verb, m := range r.MapCtrl {
 		v := strings.ToUpper(verb)
 		if !reMethods.MatchString(v) {
 			l.err.Fatalf("route '%s' has invalid Request Method: '%s'", r.Name, verb)
 		}
-		if meth.Schema != nil {
-			sch := c3po.ParseSchemaWithTag("slow", meth.Schema)
-			meth.schemaFielder = sch
-			meth.Schema = nil
+		if m.Schema != nil {
+			sch := c3po.ParseSchemaWithTag("slow", m.Schema)
+			m.schemaFielder = sch
+			m.Schema = nil
 
 		}
-		ctrl[v] = meth
+		ctrl[v] = m
 	}
 
 	r.MapCtrl = ctrl
@@ -171,19 +180,36 @@ func (r *Route) matchURL(ctx *Ctx, url string) bool {
 				return true
 			}
 		}
+		if r.isUrlPrefix {
+			if lRegex < lSplit {
+				for i, uRe := range r.urlRegex {
+					str := urlSplit[i]
+					if !uRe.MatchString(str) {
+						return false
+					}
+				}
+				return true
+			}
+		}
 		return false
 	}
 
 	for i, uRe := range r.urlRegex {
-		var str string
-		if i < lSplit {
-			str = urlSplit[i]
-		}
+		str := urlSplit[i]
 		if !uRe.MatchString(str) {
 			return false
 		}
 	}
 
+	if ctx.App.StrictSlash {
+		last := string(url[len(url)-1])
+		if r.hasSufix && last == "/" {
+			return true
+		} else if !r.hasSufix && last != "/" {
+			return true
+		}
+		return false
+	}
 	return true
 }
 
@@ -228,7 +254,7 @@ func (r *Route) GetRouter() *Router {
 
  */
 
-func Get(url string, f Func) *Route {
+func GET(url string, f Func) *Route {
 	return &Route{
 		Url:     url,
 		Func:    f,
@@ -237,7 +263,7 @@ func Get(url string, f Func) *Route {
 	}
 }
 
-func Head(url string, f Func) *Route {
+func HEAD(url string, f Func) *Route {
 	return &Route{
 		Url:     url,
 		Func:    f,
@@ -246,7 +272,7 @@ func Head(url string, f Func) *Route {
 	}
 }
 
-func Post(url string, f Func) *Route {
+func POST(url string, f Func) *Route {
 	return &Route{
 		Url:     url,
 		Func:    f,
@@ -255,7 +281,7 @@ func Post(url string, f Func) *Route {
 	}
 }
 
-func Put(url string, f Func) *Route {
+func PUT(url string, f Func) *Route {
 	return &Route{
 		Url:     url,
 		Func:    f,
@@ -264,7 +290,7 @@ func Put(url string, f Func) *Route {
 	}
 }
 
-func Delete(url string, f Func) *Route {
+func DELETE(url string, f Func) *Route {
 	return &Route{
 		Url:     url,
 		Func:    f,
@@ -273,7 +299,7 @@ func Delete(url string, f Func) *Route {
 	}
 }
 
-func Connect(url string, f Func) *Route {
+func CONNECT(url string, f Func) *Route {
 	return &Route{
 		Url:     url,
 		Func:    f,
@@ -282,7 +308,7 @@ func Connect(url string, f Func) *Route {
 	}
 }
 
-func Options(url string, f Func) *Route {
+func OPTIONS(url string, f Func) *Route {
 	return &Route{
 		Url:     url,
 		Func:    f,
@@ -291,7 +317,7 @@ func Options(url string, f Func) *Route {
 	}
 }
 
-func Trace(url string, f Func) *Route {
+func TRACE(url string, f Func) *Route {
 	return &Route{
 		Url:     url,
 		Func:    f,
@@ -300,11 +326,18 @@ func Trace(url string, f Func) *Route {
 	}
 }
 
-func Patch(url string, f Func) *Route {
+func PATCH(url string, f Func) *Route {
 	return &Route{
 		Url:     url,
 		Func:    f,
 		Name:    getFunctionName(f),
 		Methods: []string{"PATCH"},
 	}
+}
+
+func Handler(h http.Handler) Func {
+	if h == nil {
+		panic("handler is nil")
+	}
+	return func(ctx *Ctx) { h.ServeHTTP(ctx, ctx.Request.raw) }
 }

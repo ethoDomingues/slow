@@ -775,31 +775,31 @@ func index(ctx *slow.Ctx) {
             
       ```
 
-  - _(r *Router)_ **Connect(** _[url](#url) string, f [Func](#func)_ **)**
+  - _(r *Router)_ **CONNECT(** _[url](#url) string, f [Func](#func)_ **)**
       > adds a new route that corresponds to the http "CONNECT" method
 
-  - _(r *Router)_ **Delete(** _[url](#url) string, f [Func](#func)_ **)**
+  - _(r *Router)_ **DELETE(** _[url](#url) string, f [Func](#func)_ **)**
       > adds a new route that corresponds to the http "DELETE" method
 
-  - _(r *Router)_ **Get(** _[url](#url) string, f [Func](#func)_ **)**
+  - _(r *Router)_ **GET(** _[url](#url) string, f [Func](#func)_ **)**
       > adds a new route that corresponds to the http "GET" method
 
-  - _(r *Router)_ **Head(** _[url](#url) string, f [Func](#func)_ **)**
+  - _(r *Router)_ **HEAD(** _[url](#url) string, f [Func](#func)_ **)**
       > adds a new route that corresponds to the http "HEAD" method
 
-  - _(r *Router)_ **Options(** _[url](#url) string, f [Func](#func)_ **)**
+  - _(r *Router)_ **OPTIONS(** _[url](#url) string, f [Func](#func)_ **)**
       > adds a new route that corresponds to the http "OPTIONS" method
 
-  - _(r *Router)_ **Patch(** _[url](#url) string, f [Func](#func)_ **)**
+  - _(r *Router)_ **PATCH(** _[url](#url) string, f [Func](#func)_ **)**
       > adds a new route that corresponds to the http "PATCH" method
 
-  - _(r *Router)_ **Post(** _[url](#url) string, f [Func](#func)_ **)**
+  - _(r *Router)_ **POST(** _[url](#url) string, f [Func](#func)_ **)**
       > adds a new route that corresponds to the http "POST" method
 
-  - _(r *Router)_ **Put(** _[url](#url) string, f [Func](#func)_ **)**
+  - _(r *Router)_ **PUT(** _[url](#url) string, f [Func](#func)_ **)**
       > adds a new route that corresponds to the http "PUT" method
 
-  - _(r *Router)_ **Trace(** _[url](#url) string, f [Func](#func)_ **)**
+  - _(r *Router)_ **TRACE(** _[url](#url) string, f [Func](#func)_ **)**
       > adds a new route that corresponds to the http "TRACE" method
 
 - ### Router Example
@@ -814,11 +814,11 @@ func index(ctx *slow.Ctx) {
                 AllowOrigin: "*",
             },
         }
-        router.Get("/user/{userID:int}",anyFunc1)
-        router.Get("/user/{userID:int}/profile",otherFunc1)
-        router.Put("/user/{userID:int}/profile",otherFunc2)
-        router.Head("/user/{userID:int}/profile",anyFunc2)
-        router.Post("/user/{userID:int}/profile",otherFunc3)
+        router.GET("/user/{userID:int}",anyFunc1)
+        router.GET("/user/{userID:int}/profile",otherFunc1)
+        router.PUT("/user/{userID:int}/profile",otherFunc2)
+        router.HEAD("/user/{userID:int}/profile",anyFunc2)
+        router.POST("/user/{userID:int}/profile",otherFunc3)
 
         app.Mount(router)
         ...

@@ -1,11 +1,13 @@
 package slow
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"html/template"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -25,29 +27,10 @@ func NewResponse(wr http.ResponseWriter, ctx *Ctx) *Response {
 
 type Response struct {
 	*bytes.Buffer
-
 	StatusCode int
-
-	Headers Header
-
-	ctx *Ctx
-	raw http.ResponseWriter
-}
-
-func (r Response) Header() http.Header {
-	return http.Header(r.Headers)
-}
-
-func (r Response) Write(b []byte) (int, error) {
-	return r.Buffer.Write(b)
-}
-
-func (r Response) WriteHeader(statusCode int) {
-	(&r).StatusCode = statusCode
-}
-
-func (r *Response) RawResponse() http.ResponseWriter {
-	return r.raw
+	Headers    Header
+	ctx        *Ctx
+	raw        http.ResponseWriter
 }
 
 func (r *Response) _write(v any) {
@@ -63,12 +46,12 @@ func (r *Response) parseHeaders() {
 	method := ctx.Request.Method
 	routerCors := ctx.MatchInfo.Router.Cors
 	if routerCors != nil {
-		routerCors.parse(r.Headers)
+		routerCors.parse(r.Headers, ctx.Request)
 	}
 	routeCors := ctx.MatchInfo.Route.Cors
 	h := r.Headers
 	if routeCors != nil {
-		routeCors.parse(r.Headers)
+		routeCors.parse(r.Headers, ctx.Request)
 	}
 	if routerCors != nil || routeCors != nil {
 		if _, ok := h["Access-Control-Request-Method"]; !ok {
@@ -93,7 +76,19 @@ func (r *Response) parseHeaders() {
 	}
 }
 
-// Set a cookie in the Headers of Response
+func (r *Response) textCode(body any, code int) {
+	r.StatusCode = code
+	if body == nil {
+		body = fmt.Sprintf("%d %s", code, http.StatusText(code))
+	}
+	r.Headers.Set("Content-Type", "text/html")
+	fmt.Fprint(r, body)
+	panic(ErrHttpAbort)
+}
+
+func (r Response) Header() http.Header            { return http.Header(r.Headers) }
+func (r Response) Write(b []byte) (int, error)    { return r.Buffer.Write(b) }
+func (r Response) WriteHeader(statusCode int)     { (&r).StatusCode = statusCode }
 func (r *Response) SetCookie(cookie *http.Cookie) { r.Headers.SetCookie(cookie) }
 
 // Redirect to Following URL
@@ -109,16 +104,21 @@ func (r *Response) Redirect(url string) {
 
 func (r *Response) JSON(body any, code int) {
 	r.Reset()
-
-	j, err := json.MarshalIndent(body, "", "  ")
-	if err != nil {
-		panic(err)
-	}
-
 	r.StatusCode = code
 	r.Headers.Set("Content-Type", "application/json")
-	r.Write(j)
-	panic(ErrHttpAbort)
+	if b, ok := body.(string); ok {
+		r.WriteString(b)
+		panic(ErrHttpAbort)
+	} else if b, ok := body.(error); ok {
+		r.WriteString(b.Error())
+		panic(ErrHttpAbort)
+	}
+	if j, err := json.Marshal(body); err != nil {
+		panic(err)
+	} else {
+		r.Write(j)
+		panic(ErrHttpAbort)
+	}
 }
 
 func (r *Response) TEXT(body any, code int) {
@@ -126,15 +126,6 @@ func (r *Response) TEXT(body any, code int) {
 	r.StatusCode = code
 	r.Headers.Set("Content-Type", "text/plain")
 	r._write(body)
-	panic(ErrHttpAbort)
-}
-
-func (r *Response) textCode(body any, code int) {
-	r.StatusCode = code
-	if body == nil {
-		body = fmt.Sprintf("%d %s", code, http.StatusText(code))
-	}
-	fmt.Fprint(r, body)
 	panic(ErrHttpAbort)
 }
 
@@ -146,10 +137,8 @@ func (r *Response) HTML(body any, code int) {
 	panic(ErrHttpAbort)
 }
 
-// Halts execution and closes the "response".
-// This does not clear the response body
-func (r *Response) Close() { panic(ErrHttpAbort) }
-
+func Abort(code int)                     { panic("abort:" + fmt.Sprint(code)) }
+func (r *Response) Close()               { panic(ErrHttpAbort) }
 func (r *Response) Ok()                  { r.textCode(nil, 200) }
 func (r *Response) Created()             { r.textCode(nil, 201) }
 func (r *Response) NoContent()           { r.textCode(nil, 204) }
@@ -161,10 +150,6 @@ func (r *Response) MethodNotAllowed()    { r.textCode(nil, 405) }
 func (r *Response) ImATaerpot()          { r.textCode(nil, 418) }
 func (r *Response) InternalServerError() { r.textCode(nil, 500) }
 
-func (r *Response) checkErrByEnv(err ...any) {
-	r.InternalServerError()
-}
-
 func (r *Response) RenderTemplate(tmpl string, data ...any) {
 	var (
 		t     *template.Template
@@ -174,14 +159,14 @@ func (r *Response) RenderTemplate(tmpl string, data ...any) {
 
 	if t, ok = htmlTemplates[tmpl]; !ok || r.ctx.App.Env == "development" {
 		f, err := os.Open(filepath.Join(r.ctx.App.TemplateFolder, tmpl))
-		r.checkErr(err)
+		r.CheckErr(err)
 		buf := bytes.NewBufferString("")
 		_, err = io.Copy(buf, f)
-		r.checkErr(err)
+		r.CheckErr(err)
 		t, err = template.New(tmpl).
 			Funcs(r.ctx.App.TemplateFuncs).
 			Parse(buf.String())
-		r.checkErr(err)
+		r.CheckErr(err)
 		if htmlTemplates == nil {
 			htmlTemplates = make(map[string]*template.Template)
 		}
@@ -191,15 +176,10 @@ func (r *Response) RenderTemplate(tmpl string, data ...any) {
 		value = data[0]
 	}
 	t.Execute(r, value)
+	r.Close()
 }
 
-// Abort the current request. Server does not respond to client
-func (r *Request) Cancel() { r.Context().Done() }
-
-// Break execution, cleans up the response body, and writes the StatusCode to the response
-func Abort(code int) { panic("abort:" + fmt.Sprint(code)) }
-
-func (r *Response) checkErr(err error) {
+func (r *Response) CheckErr(err error) {
 	if err != nil {
 		l.err.Println(err)
 		if r.ctx.App.Env == "developement" {
@@ -207,4 +187,8 @@ func (r *Response) checkErr(err error) {
 		}
 		r.InternalServerError()
 	}
+}
+
+func (r *Response) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	return r.raw.(http.Hijacker).Hijack()
 }

@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -22,9 +23,15 @@ func validMac(message, messageMac, secret []byte) bool {
 }
 
 func SignJWT(headers, payload map[string]string, secret string) string {
+	if headers == nil && len(headers) == 0 {
+		headers = map[string]string{
+			"alg": "HS256",
+			"typ": "JWT",
+		}
+	}
 	bytsH, _ := json.Marshal(headers)
-	b64H := base64.RawURLEncoding.EncodeToString(bytsH)
 
+	b64H := base64.RawURLEncoding.EncodeToString(bytsH)
 	bytsP, _ := json.Marshal(payload)
 	b64P := base64.RawURLEncoding.EncodeToString(bytsP)
 
@@ -61,8 +68,12 @@ func ValidJWT(jwt, secret string) (*JWT, bool) {
 						}
 					}
 					if exp, ok := p["exp"]; ok {
-						t, err := time.Parse(time.RFC3339, exp)
-						return &JWT{h, p, secret}, (err == nil && time.Now().Before(t))
+						i, err := strconv.ParseInt(exp, 10, 64)
+						if err != nil {
+							return &JWT{h, p, secret}, false
+						}
+						t := time.Unix(i, 0)
+						return &JWT{h, p, secret}, time.Now().UTC().Before(t)
 					}
 					return &JWT{h, p, secret}, true
 				}

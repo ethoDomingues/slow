@@ -2,13 +2,10 @@ package slow
 
 import (
 	"html/template"
-	"reflect"
 	"time"
 )
 
-func NewConfig() *Config {
-	return &Config{}
-}
+func NewConfig() *Config { return &Config{} }
 
 type Config struct {
 	Env            string // environmnt
@@ -51,54 +48,5 @@ func (c *Config) checkConfig() {
 	}
 	if c.SessionPermanentExpires == 0 {
 		c.SessionPermanentExpires = time.Hour * 744
-	}
-}
-
-func (c *Config) getField(name string) reflect.Value {
-	f := reflect.ValueOf(c).Elem().FieldByName(name)
-	if !f.IsValid() {
-		return reflect.Value{}
-	}
-	if f.Kind() == reflect.Pointer {
-		return f.Elem()
-	}
-	return f
-}
-
-func (c *Config) GetField(name string) (any, bool) {
-	f := c.getField(name)
-
-	if f.IsValid() {
-		return f.Interface(), true
-	}
-	return nil, false
-}
-
-func (c *Config) Set(name string, value any) bool {
-	f := c.getField(name)
-
-	if !f.IsValid() {
-		return false
-	}
-	f.Set(reflect.ValueOf(value))
-	return true
-}
-
-func (c *Config) Fields() []string {
-	fields := []string{}
-	rv := reflect.TypeOf(c).Elem()
-	for i := 0; i < rv.NumField(); i++ {
-		f := rv.Field(i)
-		fields = append(fields, f.Name)
-	}
-	return fields
-}
-
-func (c *Config) Update(cfg *Config) {
-	for _, v := range c.Fields() {
-		f := cfg.getField(v)
-		if f.IsValid() && f.CanInterface() {
-			c.Set(v, f.Interface())
-		}
 	}
 }

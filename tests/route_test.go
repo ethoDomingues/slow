@@ -17,7 +17,7 @@ func handlerGetRouteName(ctx *slow.Ctx) { ctx.Response.TEXT(ctx.MatchInfo.Route.
 
 func TestRouteNames_Mode1(t *testing.T) {
 	app := slow.NewApp(nil)
-	app.AddRoutes([]*slow.Route{
+	app.AddRoute([]*slow.Route{
 		{
 			Url:  "/",
 			Name: "route1",
@@ -27,7 +27,7 @@ func TestRouteNames_Mode1(t *testing.T) {
 			Url:  "/",
 			Func: handlerTest1,
 		},
-		slow.Get("/", handlerTest2),
+		slow.GET("/", handlerTest2),
 	}...)
 	app.Build()
 	names := []string{"route1", "handlerTest1", "handlerTest2"}
@@ -41,7 +41,7 @@ func TestRouteNames_Mode1(t *testing.T) {
 func TestRouteNames_Mode2(t *testing.T) {
 	app := slow.NewApp(nil)
 	app.Name = "api"
-	app.AddRoutes([]*slow.Route{
+	app.AddRoute([]*slow.Route{
 		{
 			Url:  "/",
 			Name: "route1",
@@ -51,7 +51,7 @@ func TestRouteNames_Mode2(t *testing.T) {
 			Url:  "/",
 			Func: handlerTest1,
 		},
-		slow.Get("/", handlerTest2),
+		slow.GET("/", handlerTest2),
 	}...)
 	app.Build()
 	names := []string{"api.route1", "api.handlerTest1", "api.handlerTest2"}
@@ -64,15 +64,15 @@ func TestRouteNames_Mode2(t *testing.T) {
 
 func TestRouteURLs_mode1(t *testing.T) {
 	app := slow.NewApp(nil)
-	app.AddRoutes([]*slow.Route{
+	app.AddRoute([]*slow.Route{
 		{
-			Url:  "//",
+			Url:  "/",
 			Func: handlerTest1,
 		},
 		{
 			Func: handlerTest1,
 		},
-		slow.Get("/", handlerTest2),
+		slow.GET("/", handlerTest2),
 	}...)
 	app.Build()
 	for _, route := range app.Routes {
@@ -86,7 +86,7 @@ func TestRouteURLs_mode(t *testing.T) {
 	app := slow.NewApp(nil)
 	app.Prefix = "/api/v1"
 	app.StrictSlash = true
-	app.AddRoutes([]*slow.Route{
+	app.AddRoute([]*slow.Route{
 		{
 			Url:  "//",
 			Func: handlerTest1,
@@ -94,7 +94,7 @@ func TestRouteURLs_mode(t *testing.T) {
 		{
 			Func: handlerTest1,
 		},
-		slow.Get("/", handlerTest2),
+		slow.GET("/", handlerTest2),
 	}...)
 	app.Build()
 	for _, route := range app.Routes {
@@ -190,4 +190,5 @@ func TestRouteMapCtrl(t *testing.T) {
 			"DELETE": {Func: func(c *slow.Ctx) {}},
 		},
 	})
+	app.Clone()
 }

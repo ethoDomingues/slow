@@ -5,26 +5,24 @@ import (
 	"context"
 	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"io"
 	"mime"
 	"mime/multipart"
 	"net/http"
 	"net/url"
-	"reflect"
 	"strings"
 
-	"github.com/gorilla/websocket"
 	"gopkg.in/yaml.v2"
+	"nhooyr.io/websocket"
 )
 
-var wsUpgrader = websocket.Upgrader{}
-
 func NewFile(p *multipart.Part) *File {
-	byts, err := io.ReadAll(p)
+	b, err := io.ReadAll(p)
 	if err != nil {
 		panic(nil)
 	}
-	buf := bytes.NewBuffer(byts)
+	buf := bytes.NewBuffer(b)
 
 	return &File{
 		Filename:     p.FileName(),
@@ -148,49 +146,45 @@ func (r *Request) parseBody() {
 		}
 	case strings.HasPrefix(r.ContentType, "multipart/"):
 		mp := multipart.NewReader(r.Body, r.Mime["boundary"])
+		b := bytes.NewBufferString("")
 		for {
 			p, err := mp.NextPart()
 			if err == io.EOF {
 				break
 			}
 			if err != nil {
+				fmt.Println(err)
 				ctx.Response.BadRequest()
 			}
 			if p.FileName() != "" {
 				file := NewFile(p)
 				r.Files[p.FormName()] = append(r.Files[p.FormName()], file)
+			} else if p.FormName() != "" {
+				b.ReadFrom(p)
+				r.Form[p.FormName()] = b.String()
+				b.Reset()
 			}
 		}
 	}
+}
+
+func (r *Request) parseSchema() {
+	if r.ctx.SchemaFielder == nil {
+		return
+	}
+	sch := r.ctx.SchemaFielder
+	nSch, err := MountSchemaFromRequest(sch, r)
+	if err != nil {
+		r.ctx.Response.JSON(err, 400)
+	}
+	r.ctx.Schema = nSch
 }
 
 func (r *Request) parse() {
 	r.parseHeaders()
 	r.parseCookies()
 	r.parseBody()
-	if r.ctx.SchemaFielder != nil {
-		r.parseSchema()
-	}
-}
-
-func (r *Request) parseSchema() {
-	sch := r.ctx.SchemaFielder
-	nSch, err := MountSchemaFromRequest(sch, r)
-	if err != nil {
-		r.ctx.Response.JSON(err, 400)
-	}
-
-	if sch.IsPointer {
-		if nSch.Kind() != reflect.Ptr && nSch.CanAddr() {
-			nSch = nSch.Addr()
-		}
-	} else {
-		if nSch.Kind() == reflect.Ptr {
-			nSch = nSch.Elem()
-		}
-	}
-
-	r.ctx.Schema = nSch.Interface()
+	r.parseSchema()
 }
 
 // Returns the current url
@@ -232,22 +226,14 @@ func (r *Request) UrlFor(name string, external bool, args ...string) string {
 	return r.ctx.App.UrlFor(name, external, args...)
 }
 
-/* Returns a '*slow.Ctx' of the current request */
-func (r *Request) Ctx() *Ctx { return r.ctx }
-
-// Returns a 'context.Context' of the current request
-func (r *Request) Context() context.Context { return r.raw.Context() }
-
+func (r *Request) Ctx() *Ctx                          { return r.ctx }
+func (r *Request) Context() context.Context           { return r.raw.Context() }
+func (r *Request) UserAgent() string                  { return r.Header.Get("User-Agent") }
+func (r *Request) Referer() string                    { return r.Header.Get("Referer") }
+func (r *Request) RawRequest() *http.Request          { return r.raw }
+func (r *Request) Clone(ctx context.Context) *Request { return NewRequest(r.raw.Clone(ctx), r.ctx) }
 func (r *Request) WithContext(ctx context.Context) *Request {
 	return NewRequest(r.raw.WithContext(ctx), r.ctx)
-}
-
-func (r *Request) Websocket(headers http.Header) (*websocket.Conn, error) {
-	return wsUpgrader.Upgrade(r.ctx.Response.raw, r.raw, headers)
-}
-
-func (r *Request) Clone(ctx context.Context) *Request {
-	return NewRequest(r.raw.Clone(ctx), r.ctx)
 }
 
 func (r *Request) ProtoAtLeast(major, minor int) bool {
@@ -255,18 +241,13 @@ func (r *Request) ProtoAtLeast(major, minor int) bool {
 		r.ProtoMajor == major && r.ProtoMinor >= minor
 }
 
-func (r *Request) UserAgent() string {
-	return r.Header.Get("User-Agent")
-}
-
 func (r *Request) BasicAuth() (username, password string, ok bool) {
+	if r.ctx.App.BasicAuth != nil {
+		return r.ctx.App.BasicAuth(r.ctx)
+	}
 	return r.raw.BasicAuth()
 }
 
-func (r *Request) RawRequest() *http.Request {
-	return r.raw
-}
-
-func (r *Request) Referer() string {
-	return r.Header.Get("Referer")
+func (r *Request) Websocket() (*websocket.Conn, error) {
+	return websocket.Accept(r.ctx, r.raw, nil)
 }

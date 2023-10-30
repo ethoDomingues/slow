@@ -23,8 +23,8 @@ type Ctx struct {
 
 	Global map[string]any
 
-	Request  *Request  // Current Request
-	Response *Response // Current Response
+	*Response          // Current Response
+	Request   *Request // Current Request
 
 	// Current Cookie Session
 	Session *Session

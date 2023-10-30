@@ -10,7 +10,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"time"
 
 	"golang.org/x/exp/maps"
 )
@@ -37,10 +36,9 @@ func NewApp(c *Config) *App {
 		routesByName: map[string]*Route{},
 		is_main:      true,
 	}
-
-	cfg := NewConfig()
+	cfg := &Config{}
 	if c != nil {
-		cfg.Update(c)
+		*cfg = *c
 	}
 
 	return &App{
@@ -55,25 +53,44 @@ type App struct {
 	*Router
 	*Config
 	// TODO -> add testConfig, ProdConfig
+
+	BasicAuth func(*Ctx) (user string, pass string, ok bool) // custom func to parse Authorization Header
+
 	AfterRequest, // exec after each request (if the application dont crash)
 	BeforeRequest, // exec before each request
 	TearDownRequest Func // exec after each request, after send to cleint ( this dont has effect in response)
 
+	built        bool
 	routers      []*Router
 	routerByName map[string]*Router
 
-	srv   *http.Server
-	built bool
+	Srv *http.Server
+}
+
+func (app *App) Clone() *App {
+	clone := NewApp(app.Config)
+	*clone.Router = *app.Router
+
+	clone.BasicAuth = app.BasicAuth
+	clone.AfterRequest = app.AfterRequest
+	clone.BeforeRequest = app.BeforeRequest
+	clone.TearDownRequest = app.TearDownRequest
+
+	clone.Srv = app.Srv
+	clone.built = app.built
+	clone.routers = app.routers
+	clone.routerByName = app.routerByName
+	return clone
 }
 
 // Parse the router and your routes
-func (app *App) build() {
+func (app *App) parseApp() {
 	app.checkConfig()
 	if app.Servername != "" {
-		srv := app.Servername
-		srv = strings.TrimPrefix(srv, ".")
-		srv = strings.TrimSuffix(srv, "/")
-		app.Servername = srv
+		Srv := app.Servername
+		Srv = strings.TrimPrefix(Srv, ".")
+		Srv = strings.TrimSuffix(Srv, "/")
+		app.Servername = Srv
 	}
 	if app.built {
 		return
@@ -126,11 +143,12 @@ func (app *App) build() {
 func (app *App) closeConn(ctx *Ctx) {
 	rsp := ctx.Response
 	err := recover()
-	defer l.LogRequest(ctx)
+	mi := ctx.MatchInfo
+
 	defer execTeardown(ctx)
+	defer l.LogRequest(ctx)
 
 	if err == ErrHttpAbort || err == nil {
-		mi := ctx.MatchInfo
 		if mi.Match {
 			if ctx.Request.isWebsocket {
 				return
@@ -294,6 +312,7 @@ func (app *App) listRoutes() {
 
 func (app *App) match(ctx *Ctx) bool {
 	rq := ctx.Request
+
 	if app.Servername != "" {
 		rqUrl := rq.URL.Host
 		if net.ParseIP(rqUrl) != nil {
@@ -319,9 +338,9 @@ func (app *App) match(ctx *Ctx) bool {
 	return false
 }
 
-// http.Handler func
+// # http.Handler
 func (app *App) ServeHTTP(wr http.ResponseWriter, req *http.Request) {
-	ctx := newCtx(app)
+	ctx := newCtx(app.Clone())
 	ctx.Request = NewRequest(req, ctx)
 	ctx.Response = NewResponse(wr, ctx)
 	defer app.closeConn(ctx)
@@ -362,24 +381,19 @@ func (app *App) Mount(routers ...*Router) {
 	}
 }
 
-/*
-Url Builder
-
-	app.GET("/users/{userID:int}", index)
-
-	app.UrlFor("index", false, "userID", "1"})
-	// results: /users/1
-
-	app.UrlFor("index", true, "userID", "1"})
-	// results: http://yourAddress/users/1
-*/
+// # Url Builder
+//
+//	app.GET("/users/{userID:int}", index)
+//
+//	app.UrlFor("index", false, "userID", "1"}) //  /users/1
+//	app.UrlFor("index", true, "userID", "1"}) // http://yourAddress/users/1
 func (app *App) UrlFor(name string, external bool, args ...string) string {
 	var (
 		host   = ""
 		route  *Route
 		router *Router
 	)
-	if app.srv == nil {
+	if app.Srv == nil {
 		l.err.Fatalf("you are trying to use this function outside of a context")
 	}
 	if len(args)%2 != 0 {
@@ -414,14 +428,14 @@ func (app *App) UrlFor(name string, external bool, args ...string) string {
 	// Build Host
 	if external {
 		schema := "http://"
-		if app.ListeningInTLS || len(app.srv.TLSConfig.Certificates) > 0 {
+		if app.ListeningInTLS || len(app.Srv.TLSConfig.Certificates) > 0 {
 			schema = "https://"
 		}
 		if router.Subdomain != "" {
 			host = schema + router.Subdomain + "." + app.Servername
 		} else {
 			if app.Servername == "" {
-				_, p, _ := net.SplitHostPort(app.srv.Addr)
+				_, p, _ := net.SplitHostPort(app.Srv.Addr)
 				h := net.JoinHostPort(localAddress, p)
 				host = schema + h
 			} else {
@@ -488,6 +502,7 @@ example:
 	}
 */
 func (app *App) Build(addr ...string) {
+	app.parseApp()
 
 	var address string
 	if app.Env == "" {
@@ -510,17 +525,13 @@ func (app *App) Build(addr ...string) {
 		address = "127.0.0.1:5000"
 	}
 
-	app.build()
-
 	if strings.Contains(address, "0.0.0.0") {
 		listenInAll = true
 	}
 
-	app.srv = &http.Server{
+	app.Srv = &http.Server{
 		Addr:           address,
 		Handler:        app,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
 		MaxHeaderBytes: 1 << 20,
 	}
 
@@ -528,13 +539,13 @@ func (app *App) Build(addr ...string) {
 }
 
 func (app *App) logStarterListener() {
-	addr, port, err := net.SplitHostPort(app.srv.Addr)
+	addr, port, err := net.SplitHostPort(app.Srv.Addr)
 	if err != nil {
 		l.err.Panic(err)
 	}
 	envDev := app.Env == "development"
 	if listenInAll {
-		app.srv.Addr = localAddress
+		app.Srv.Addr = localAddress
 		if envDev {
 			l.Defaultf("Server is listening on all address in %sdevelopment mode%s", _RED, _RESET)
 		} else {
@@ -555,11 +566,18 @@ func (app *App) logStarterListener() {
 	}
 }
 
-// Build a app and starter Server
-func (app *App) Listen(host ...string) {
+func (app *App) Listen(host ...string) error {
 	app.Build(host...)
 	if !app.Silent {
 		app.logStarterListener()
 	}
-	app.srv.ListenAndServe()
+	return app.Srv.ListenAndServe()
+}
+
+func (app *App) ListenTLS(host, certFile, certKey string) error {
+	app.Build(host)
+	if !app.Silent {
+		app.logStarterListener()
+	}
+	return app.Srv.ListenAndServeTLS("ssl/server.crt", "ssl/server.key")
 }

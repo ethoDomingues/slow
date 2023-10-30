@@ -6,36 +6,29 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 )
 
 func serveFileHandler(ctx *Ctx) {
-	rsp := ctx.Response
 	rq := ctx.Request
 
-	uri := rq.URL.Path
-	static := ctx.App.StaticUrlPath
-	if ctx.App.Prefix != "" {
-		static = filepath.Join(ctx.App.Prefix, static)
-	}
-	pathToFile := strings.TrimPrefix(uri, static)
-	pathToFile = filepath.Join(ctx.App.StaticFolder, pathToFile)
+	urlFilePath := rq.Args["filepath"]
+	pathToFile := filepath.Join(ctx.App.StaticFolder, urlFilePath)
 	if f, err := os.Open(pathToFile); err == nil {
 		_, file := filepath.Split(pathToFile)
 		defer f.Close()
 		if fStat, err := f.Stat(); err != nil || fStat.IsDir() {
-			rsp.NotFound()
+			ctx.NotFound()
 		}
-		io.Copy(rsp, f)
+		ctx.ReadFrom(f)
 		ctype := mime.TypeByExtension(filepath.Ext(file))
 		if ctype == "application/octet-stream" {
-			ctype = http.DetectContentType(rsp.Bytes())
+			ctype = http.DetectContentType(ctx.Bytes())
 		}
-		rsp.Headers.Set("Content-Type", ctype)
-		rsp.Close()
+		ctx.Headers.Set("Content-Type", ctype)
+		ctx.Close()
 	} else {
 		if ctx.App.Env == "development" {
-			rsp.TEXT(err, 404)
+			ctx.TEXT(err, 404)
 		}
 		ctx.Response.NotFound()
 	}
@@ -59,7 +52,7 @@ func ServeFile(ctx *Ctx, pathToFile ...string) {
 		rsp.Headers.Set("Content-Type", ctype)
 		rsp.Close()
 	} else if ctx.App.Env != "prod" {
-		rsp.checkErrByEnv(err)
+		rsp.CheckErr(err)
 	} else {
 		rsp.NotFound()
 	}

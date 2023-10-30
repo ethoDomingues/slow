@@ -2,6 +2,7 @@ package slow
 
 import (
 	"fmt"
+	"log"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -19,21 +20,20 @@ func NewRouter(name string) *Router {
 }
 
 type Router struct {
-	is_main bool
-
 	Name,
 	Prefix,
 	Subdomain string
 	StrictSlash bool
 
-	EnableSwagger bool
-
 	Cors        *Cors
 	Routes      []*Route
 	Middlewares []Func
 
+	is_main        bool
 	routesByName   map[string]*Route
 	subdomainRegex *regexp.Regexp
+
+	// httpHandler *http.Handler
 }
 
 func (r *Router) parse(servername string) {
@@ -50,10 +50,10 @@ func (r *Router) parse(servername string) {
 		}
 		sub := r.Subdomain
 		if re.digit.MatchString(sub) {
-			panic(fmt.Sprintf("router subdomain dont accept 'int' varible. Router: '%s'", r.Name))
+			sub = re.digit.ReplaceAllString(sub, `(\d+)`)
 		}
-		if re.filepath.MatchString(sub) {
-			panic(fmt.Sprintf("router subdomain dont accept 'filepath' varible. Router: '%s'", r.Name))
+		if re.all.MatchString(sub) {
+			log.Panicf("'{*}' is not alowwed in router subdomain: '%s'", r.Name)
 		}
 		if re.str.MatchString(sub) {
 			sub = re.str.ReplaceAllString(sub, `(\w+)`)
@@ -101,6 +101,7 @@ func (r *Router) parseRoute(route *Route) {
 	r.routesByName[route.Name] = route
 	route.router = r
 	route.parsed = true
+
 }
 
 func (r *Router) match(ctx *Ctx) bool {
@@ -120,18 +121,8 @@ func (r *Router) match(ctx *Ctx) bool {
 	return false
 }
 
-func (r *Router) AddRoute(route *Route) {
-	if r.Routes == nil {
-		r.Routes = []*Route{}
-		r.routesByName = map[string]*Route{}
-	}
-	r.Routes = append(r.Routes, route)
-}
-
-func (r *Router) AddRoutes(routes ...*Route) {
-	for _, route := range routes {
-		r.AddRoute(route)
-	}
+func (r *Router) AddRoute(routes ...*Route) {
+	r.Routes = append(r.Routes, routes...)
 }
 
 func (r *Router) Add(url, name string, f Func, meths []string) {
@@ -144,7 +135,7 @@ func (r *Router) Add(url, name string, f Func, meths []string) {
 		})
 }
 
-func (r *Router) Get(url string, f Func) {
+func (r *Router) GET(url string, f Func) {
 	r.AddRoute(&Route{
 		Url:     url,
 		Func:    f,
@@ -162,7 +153,7 @@ func (r *Router) Head(url string, f Func) {
 	})
 }
 
-func (r *Router) Post(url string, f Func) {
+func (r *Router) POST(url string, f Func) {
 	r.AddRoute(&Route{
 		Url:     url,
 		Func:    f,
@@ -171,7 +162,7 @@ func (r *Router) Post(url string, f Func) {
 	})
 }
 
-func (r *Router) Put(url string, f Func) {
+func (r *Router) PUT(url string, f Func) {
 	r.AddRoute(&Route{
 		Url:     url,
 		Func:    f,
@@ -180,7 +171,7 @@ func (r *Router) Put(url string, f Func) {
 	})
 }
 
-func (r *Router) Delete(url string, f Func) {
+func (r *Router) DELETE(url string, f Func) {
 	r.AddRoute(&Route{
 		Url:     url,
 		Func:    f,
@@ -189,7 +180,7 @@ func (r *Router) Delete(url string, f Func) {
 	})
 }
 
-func (r *Router) Connect(url string, f Func) {
+func (r *Router) CONNECT(url string, f Func) {
 	r.AddRoute(&Route{
 		Url:     url,
 		Func:    f,
@@ -198,7 +189,7 @@ func (r *Router) Connect(url string, f Func) {
 	})
 }
 
-func (r *Router) Options(url string, f Func) {
+func (r *Router) OPTIONS(url string, f Func) {
 	r.AddRoute(&Route{
 		Url:     url,
 		Func:    f,
@@ -207,7 +198,7 @@ func (r *Router) Options(url string, f Func) {
 	})
 }
 
-func (r *Router) Trace(url string, f Func) {
+func (r *Router) TRACE(url string, f Func) {
 	r.AddRoute(&Route{
 		Url:     url,
 		Func:    f,
@@ -216,11 +207,22 @@ func (r *Router) Trace(url string, f Func) {
 	})
 }
 
-func (r *Router) Patch(url string, f Func) {
+func (r *Router) PATCH(url string, f Func) {
 	r.AddRoute(&Route{
 		Url:     url,
 		Func:    f,
 		Name:    getFunctionName(f),
 		Methods: []string{"PATCH"},
+	})
+}
+
+func (r *Router) AllMethods(url string, f Func) {
+	r.AddRoute(&Route{
+		Url:  url,
+		Func: f,
+		Name: getFunctionName(f),
+		Methods: []string{
+			"GET", "POST", "PUT", "DELETE",
+			"CONNECT", "OPTIONS", "TRACE", "PATCH"},
 	})
 }

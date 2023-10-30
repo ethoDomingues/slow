@@ -1,6 +1,7 @@
 package slow
 
 import (
+	"bytes"
 	"errors"
 	"regexp"
 	"strings"
@@ -21,9 +22,9 @@ type MatchInfo struct {
 }
 
 type _re struct {
-	str      *regexp.Regexp
-	digit    *regexp.Regexp
-	filepath *regexp.Regexp
+	str   *regexp.Regexp
+	all   *regexp.Regexp
+	digit *regexp.Regexp
 
 	isVar    *regexp.Regexp
 	isVarOpt *regexp.Regexp
@@ -35,12 +36,12 @@ var (
 	reMethods = regexp.MustCompile("^(?i)(GET|PUT|HEAD|POST|TRACE|PATCH|DELETE|CONNECT|OPTIONS)$")
 
 	re = _re{
-		str:      regexp.MustCompile(`{\w+(:str)?}`),
-		isVar:    regexp.MustCompile(`{\w+(\:(int|str|path))?`),
-		digit:    regexp.MustCompile(`{\w+:int}`),
-		filepath: regexp.MustCompile(`{\w+:path}`),
-		dot2:     regexp.MustCompile(`[.]{2,}`),
-		slash2:   regexp.MustCompile(`[\/]{2,}`),
+		str:    regexp.MustCompile(`{\w+(:str)?}`),
+		all:    regexp.MustCompile(`(\{\*\})|(\{\w+:path\})`),
+		isVar:  regexp.MustCompile(`{\w+(\:(int|str|path))?\}|\{\*\}`),
+		digit:  regexp.MustCompile(`{\w+:int}`),
+		dot2:   regexp.MustCompile(`[.]{2,}`),
+		slash2: regexp.MustCompile(`[\/]{2,}`),
 	}
 )
 
@@ -60,11 +61,25 @@ func (r *_re) getVarName(str string) string {
 func (r _re) getUrlValues(url, requestUrl string) map[string]string {
 	req := strings.Split(requestUrl, "/")
 	kv := map[string]string{}
-
 	for i, str := range strings.Split(url, "/") {
 		if i < len(req) {
 			if re.isVar.MatchString(str) {
-				kv[re.getVarName(str)] = req[i]
+				varName := re.getVarName(str)
+				if varName == str {
+					continue
+				} else if re.all.MatchString(str) {
+					strs := bytes.NewBufferString("")
+					for c := i; c < len(req); c++ {
+						strs.WriteString("/" + req[c])
+					}
+					if strings.HasSuffix(requestUrl, "/") {
+						strs.WriteString("/")
+					}
+					kv[varName] = strs.String()
+					continue
+				} else {
+					kv[varName] = req[i]
+				}
 			}
 		}
 	}
