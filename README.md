@@ -1,8 +1,6 @@
 # Slow
 
-## [See the Documentation](https://github.com/ethoDomingues/slow/blob/main/doc.md)
-
-<br>
+## [See the Documentation](https://github.com/ethoDomingues/slow/blob/main/docs/doc.md)
 
 ## Simple Example
 
@@ -17,14 +15,14 @@ go get github.com/ethoDomingues/slow
 ```go
 package main
 
-import "github.com/ethodomingues/slow"
+import "github.com/ethoDomingues/slow"
 
 func main() {
  app := slow.NewApp()
  app.GET("/hello", helloWorld)
  app.GET("/hello/{name}", helloUser) // 'name' is any string
  app.GET("/hello/{userID:int}", userByID) // 'userID' is only int
- 
+
  fmt.Println(app.Listen())
 }
 
