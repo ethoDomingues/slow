@@ -81,7 +81,9 @@ func (r *Route) compileUrl() {
 		}
 	}
 	if r.hasSufix {
-		r.Url = r.Url + "/"
+		if r.Url != "/" {
+			r.Url = r.Url + "/"
+		}
 	}
 	r.isUrlPrefix = isPrefix
 }
@@ -153,7 +155,6 @@ func (r *Route) parse() {
 
 	r.compileUrl()
 	r.compileMethods()
-
 	if r.Cors != nil {
 		r.Cors.AllowMethods = strings.Join(r.Methods, ", ")
 	} else {
